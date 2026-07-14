@@ -1,0 +1,40 @@
+.flywheel-wrap{
+  background:var(--gradient-surface), var(--bg-card);
+  border:1px solid var(--line); border-radius:var(--radius-lg);
+  padding:22px 16px 16px; margin-bottom:18px;
+  box-shadow:var(--shadow-card);
+  position:relative; overflow:hidden;
+}
+.flywheel-wrap::before{
+  content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+  background:radial-gradient(ellipse 260px 260px at 50% 40%, rgba(0,217,160,0.06), transparent 70%);
+}
+.flywheel-svg{width:100%; height:auto; display:block; position:relative; z-index:1;}
+.fw-count{display:flex; align-items:baseline; gap:9px; margin-top:18px; padding-top:16px; border-top:1px solid var(--line); position:relative; z-index:1;}
+.fw-count-num{font-family:var(--font-display); font-size:28px; font-weight:600; color:var(--ledger); line-height:1;}
+.fw-count-label{font-size:11.5px; color:var(--text-dim); line-height:1.45;}
+.fw-legend{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px; position:relative; z-index:1;}
+.fw-legend-item{display:flex; gap:8px; align-items:flex-start; font-size:11.5px; color:var(--text-dim); line-height:1.45;}
+.fw-legend-dot{width:7px; height:7px; border-radius:50%; margin-top:4px; flex-shrink:0; box-shadow:0 0 5px currentColor;}
+
+/* --- Анимация появления карты экосистемы: спицы "дорисовываются" через
+   stroke-dasharray reveal, узлы всплывают со staggered delay, хаб —
+   первым. Работает через inline style="animation-delay" из flywheelDiagram.js,
+   классы/структура остаются прежними (визуал-only). --- */
+@keyframes fw-spoke-draw{ from{ stroke-dashoffset:120; opacity:0; } to{ stroke-dashoffset:0; opacity:0.55; } }
+@keyframes fw-node-pop{ from{ opacity:0; transform:scale(0.6); } to{ opacity:1; transform:scale(1); } }
+@keyframes fw-orbit-fade{ from{ opacity:0; } to{ opacity:1; } }
+
+.fw-orbit{ animation:fw-orbit-fade .6s var(--ease-out) both; transform-origin:160px 160px; }
+.fw-spoke{ stroke-dasharray:4 6; stroke-dashoffset:0; animation:fw-spoke-draw .55s var(--ease-out) both; }
+.fw-node{ transform-box:fill-box; transform-origin:center; animation:fw-node-pop .5s var(--ease-spring) both; }
+.fw-node-ring{ opacity:0; transition:opacity .25s var(--ease), stroke-width .25s var(--ease); pointer-events:none; }
+.fw-node{ cursor:pointer; }
+.fw-node:hover .fw-node-ring, .fw-node:focus-visible .fw-node-ring{ opacity:0.55; }
+.fw-node:focus-visible{ outline:none; }
+.fw-node text{ transition:fill .2s var(--ease); }
+.fw-hub{ animation:fw-node-pop .5s var(--ease-spring) both; }
+
+@media (prefers-reduced-motion: reduce){
+  .fw-orbit, .fw-spoke, .fw-node, .fw-hub{ animation:none; }
+}

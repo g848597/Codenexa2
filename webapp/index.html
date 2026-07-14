@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>CodeNexa</title>
+  <meta name="description" content="CodeNexa — экосистема продуктов: дэшборд роста, документы, спорт-аналитика." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="/src/styles/tokens.css" />
+  <link rel="stylesheet" href="/src/styles/base.css" />
+  <link rel="stylesheet" href="/src/styles/app.css" />
+  <link rel="stylesheet" href="/src/styles/investors.css" />
+  <link rel="stylesheet" href="/src/styles/flywheel.css" />
+  <link rel="stylesheet" href="/src/styles/legal.css" />
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div class="ambient"></div>
+
+  <!-- Карточка входа/регистрации — main.js показывает её, пока нет активной сессии -->
+  <div id="auth-root"></div>
+
+  <div class="app" id="app" hidden>
+    <header>
+      <div class="header-inner">
+        <div class="brand-row">
+          <div class="brand">
+            <div class="brand-mark">CN</div>
+            <div class="brand-name">CodeNexa</div>
+          </div>
+          <div class="header-right">
+            <span class="data-badge" id="data-badge">Данные проверены</span>
+            <button class="lang-toggle" id="lang-toggle" type="button">RU</button>
+          </div>
+        </div>
+        <div class="tabs" id="tabs">
+          <div class="tab active" data-view="dashboard">Дэшборд</div>
+          <div class="tab" data-view="account">Аккаунт</div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- Дэшборд: единая прокручиваемая страница со всеми секциями -->
+      <section id="view-dashboard" class="view active">
+        <div id="onboarding-root"></div>
+
+        <div id="hero-root" class="hero"></div>
+
+        <div class="section-head">
+          <h2 id="products-title">Продукты</h2>
+        </div>
+        <div id="ledger-root" class="ledger-list"></div>
+
+        <div class="section-head">
+          <h2 id="flywheel-title">Экосистема</h2>
+        </div>
+        <div id="flywheel-root"></div>
+
+        <div class="section-head">
+          <h2 id="roadmap-title">Дорожная карта</h2>
+        </div>
+        <div id="timeline-root" class="timeline"></div>
+
+        <div class="section-head">
+          <h2 id="partners-title">Партнёры</h2>
+        </div>
+        <div id="partners-root"></div>
+
+        <div class="section-head">
+          <h2 id="trust-title">Доверие</h2>
+        </div>
+        <div id="trust-root"></div>
+
+        <div id="investors-root" class="investors-section"></div>
+
+        <footer>
+          <p>CODENEXA GROWTH CONSOLE · ИЮЛЬ 2026</p>
+          <button class="footer-legal-link" id="legal-link" type="button">Политика конфиденциальности · Условия использования</button>
+        </footer>
+      </section>
+
+      <!-- Полноэкранные разделы — main.js/компоненты сами наполняют их через document.getElementById -->
+      <section id="view-account" class="view"></section>
+      <section id="view-docs-app" class="view"></section>
+      <section id="view-sport-app" class="view"></section>
+      <section id="view-legal" class="view"></section>
+      <section id="view-product" class="view"></section>
+    </main>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

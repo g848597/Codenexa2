@@ -1,0 +1,55 @@
+/* Design tokens — единственное место, где меняется палитра/типографика проекта */
+:root{
+  --bg:#0a0b0d;
+  --bg-elevated:#121418;
+  --bg-card:#15171c;
+  --line:rgba(255,255,255,0.08);
+  --line-strong:rgba(255,255,255,0.14);
+  --text:#eceef1;
+  --text-dim:#8b9099;
+  --text-faint:#82868f; /* было #565b64 — поднято для контраста ≥4.5:1 на --bg и --bg-card (WCAG AA), см. аудит Модуля 6 */
+
+  --ledger:#00d9a0;
+  --ledger-dim:rgba(0,217,160,0.14);
+  --ledger-deep:#00a87c; /* тёмный оттенок ledger для градиентов (brand-mark, stage-fill) */
+  --amber:#f0a93a;
+  --amber-dim:rgba(240,169,58,0.14);
+  --steel:#5b9dff;
+  --steel-dim:rgba(91,157,255,0.14);
+  --danger:#ff5a40;
+  --danger-dim:rgba(255,90,64,0.14);
+  --danger-text:#ffb4a8; /* danger-текст на тёмном фоне (не путать с --danger, который для иконок/акцентов на светлом) */
+
+  /* Текст поверх акцентных заливок — тёмный, чтобы не путать с основным --text (светлым) */
+  --on-ledger:#031f16;
+  --on-amber:#2a1a00;
+  --on-steel:#04101f;
+  --on-danger:#2a0d06;
+
+  --font-display:'Fraunces', serif;
+  --font-body:'Inter', sans-serif;
+  --font-mono:'JetBrains Mono', monospace;
+
+  --radius-lg:16px;
+  --radius-md:12px;
+  --radius-sm:9px;
+
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --shadow-card:0 1px 2px rgba(0,0,0,0.35), 0 10px 28px -14px rgba(0,0,0,0.55);
+  --shadow-card-hover:0 2px 4px rgba(0,0,0,0.4), 0 18px 40px -16px rgba(0,0,0,0.6);
+  --divider-fade:linear-gradient(90deg, transparent, var(--line-strong) 18%, var(--line-strong) 82%, transparent);
+
+  /* --- Расширение токенов: премиальный редизайн (визуал-only, см. app.css/investors.css) --- */
+  --grain-opacity:0.035;
+  --glow-ledger:0 0 0 1px rgba(0,217,160,0.16), 0 8px 28px -10px rgba(0,217,160,0.35);
+  --glow-steel:0 0 0 1px rgba(91,157,255,0.16), 0 8px 28px -10px rgba(91,157,255,0.35);
+  --glow-amber:0 0 0 1px rgba(240,169,58,0.16), 0 8px 28px -10px rgba(240,169,58,0.35);
+  --gradient-ledger:linear-gradient(135deg, var(--ledger), var(--ledger-deep));
+  --gradient-steel:linear-gradient(135deg, #7db4ff, var(--steel));
+  --gradient-surface:linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0));
+  --gradient-card-hover:linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0));
+  --border-glass:1px solid rgba(255,255,255,0.09);
+  --ease-spring:cubic-bezier(.34,1.28,.64,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --card-pad:18px;
+}

@@ -1,0 +1,292 @@
+/* Раздел "Инвесторы": публичная витрина (investors.js) + админ-панель
+   (investorsAdmin.js). Использует токены из tokens.css. Только визуал —
+   классы и структура заданы в JS и не меняются здесь. */
+
+/* ============ ПУБЛИЧНАЯ ВИТРИНА (investors.js) ============ */
+
+.investors-section { margin-top: 6px; }
+
+.inv-hero {
+  position: relative;
+  padding: 30px 22px 26px;
+  margin-bottom: 22px;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse 480px 240px at 15% 0%, rgba(0,217,160,0.16), transparent 65%),
+    radial-gradient(ellipse 380px 260px at 100% 30%, rgba(91,157,255,0.1), transparent 65%),
+    var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+.inv-hero::after {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(ellipse 340px 220px at 20% 10%, black, transparent 70%);
+  pointer-events: none;
+}
+.inv-hero-eyebrow { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--ledger); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; position: relative; }
+.inv-hero-eyebrow::before { content: ''; width: 14px; height: 1px; background: var(--ledger); display: inline-block; }
+.inv-hero h1 { font-family: var(--font-display); font-size: 26px; line-height: 1.2; font-weight: 500; letter-spacing: -0.3px; position: relative; }
+.inv-hero h1 em { font-style: normal; color: var(--ledger); background: linear-gradient(135deg, var(--ledger), #5ce8bd); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.inv-hero p { color: var(--text-dim); font-size: 13.5px; line-height: 1.6; margin-top: 12px; max-width: 40ch; position: relative; }
+
+.inv-stats-row { display: flex; gap: 10px; margin-top: 20px; position: relative; }
+.inv-stat-chip { flex: 1; background: rgba(0,0,0,0.18); border: 1px solid var(--line-strong); border-radius: var(--radius-md); padding: 14px; text-align: center; backdrop-filter: blur(6px); }
+.inv-stat-chip .n { display: block; font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1.05; }
+.inv-stat-chip .l { font-size: 10.5px; color: var(--text-dim); margin-top: 4px; display: block; }
+
+/* --- разбивка по географии --- */
+.inv-geo { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); position: relative; }
+.inv-geo-title { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+.inv-geo-bar { display: flex; width: 100%; height: 8px; border-radius: 6px; overflow: hidden; background: rgba(255,255,255,0.05); }
+.inv-geo-seg { display: block; height: 100%; min-width: 3px; }
+.inv-geo-seg[data-idx="0"] { background: var(--ledger); }
+.inv-geo-seg[data-idx="1"] { background: var(--steel); }
+.inv-geo-seg[data-idx="2"] { background: var(--amber); }
+.inv-geo-seg[data-idx="3"] { background: #c084fc; }
+.inv-geo-seg[data-idx="4"] { background: #f472b6; }
+.inv-geo-seg[data-idx="5"] { background: var(--text-faint); }
+.inv-geo-legend { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.inv-geo-legend-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-dim); }
+.inv-geo-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.inv-geo-dot[data-idx="0"] { background: var(--ledger); }
+.inv-geo-dot[data-idx="1"] { background: var(--steel); }
+.inv-geo-dot[data-idx="2"] { background: var(--amber); }
+.inv-geo-dot[data-idx="3"] { background: #c084fc; }
+.inv-geo-dot[data-idx="4"] { background: #f472b6; }
+.inv-geo-dot[data-idx="5"] { background: var(--text-faint); }
+.inv-geo-flag { font-size: 13px; }
+.inv-geo-name { flex: 1; }
+.inv-geo-count { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint); }
+
+/* --- разбивка по суммам инвестиций --- */
+.inv-amt-chart { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.inv-amt-cards { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.inv-amt-card { background: rgba(0,0,0,0.16); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 13px 14px; }
+.inv-amt-card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.inv-amt-currency { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); letter-spacing: 0.4px; }
+.inv-amt-total { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--ledger); }
+.inv-amt-bar-row { display: grid; grid-template-columns: 72px 1fr auto; align-items: center; gap: 8px; margin-bottom: 7px; }
+.inv-amt-bar-row:last-child { margin-bottom: 0; }
+.inv-amt-bar-name { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inv-amt-bar-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+.inv-amt-bar-fill { height: 100%; background: linear-gradient(90deg, var(--ledger), var(--steel)); border-radius: 4px; }
+.inv-amt-bar-value { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); white-space: nowrap; }
+.inv-amt-note { font-size: 11px; color: var(--text-faint); font-style: italic; margin-top: 10px; }
+
+/* --- сетка карточек инвесторов --- */
+.inv-grid { display: flex; flex-direction: column; gap: 14px; }
+
+.inv-card {
+  --mx: 50%; --my: 50%;
+  border-radius: 20px; padding: 1px; cursor: default;
+  background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+  opacity: 0; transform: translateY(14px);
+  transition: opacity .5s var(--ease-out), transform .5s var(--ease-out);
+}
+.inv-card.in-view { opacity: 1; transform: translateY(0); }
+.inv-card-inner {
+  position: relative; border-radius: 19px; overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow .3s var(--ease), border-color .3s var(--ease);
+}
+.inv-card-inner::before {
+  content: '';
+  position: absolute; inset: 0; z-index: 0; opacity: 0; pointer-events: none;
+  background: radial-gradient(280px circle at var(--mx) var(--my), rgba(0,217,160,0.14), transparent 60%);
+  transition: opacity .3s var(--ease);
+}
+.inv-card:hover .inv-card-inner::before { opacity: 1; }
+.inv-card:hover .inv-card-inner { border-color: var(--line-strong); box-shadow: var(--shadow-card-hover); }
+
+.inv-status-pill {
+  position: absolute; top: 14px; right: 16px; z-index: 2;
+  font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--ledger); background: var(--ledger-dim); border: 1px solid rgba(0,217,160,0.25);
+  border-radius: 20px; padding: 3px 8px 3px 7px; display: flex; align-items: center; gap: 4px;
+}
+.inv-status-pill::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--ledger); box-shadow: 0 0 5px var(--ledger); }
+
+.inv-card-top { display: flex; align-items: center; gap: 14px; padding: 20px 20px 0; position: relative; z-index: 1; }
+.inv-photo { width: 60px; height: 60px; border-radius: 16px; object-fit: cover; flex-shrink: 0; border: 1px solid var(--line-strong); }
+.inv-photo-fallback {
+  width: 60px; height: 60px; border-radius: 16px; flex-shrink: 0;
+  background: var(--gradient-steel); color: var(--on-steel);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 19px;
+}
+.inv-id { min-width: 0; padding-right: 60px; }
+.inv-name { font-family: var(--font-display); font-size: 16.5px; font-weight: 600; letter-spacing: -0.1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inv-position { font-size: 12px; color: var(--text-dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inv-meta-row { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-faint); margin-top: 4px; }
+.inv-country-flag { font-size: 11px; }
+
+.inv-desc { padding: 14px 20px 0; font-size: 12.5px; color: var(--text-dim); line-height: 1.55; position: relative; z-index: 1; }
+.inv-divider { margin: 16px 20px 0; height: 1px; background: var(--divider-fade); }
+
+.inv-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 20px 20px; position: relative; z-index: 1; }
+.inv-amount { display: flex; flex-direction: column; }
+.inv-amount .v { font-family: var(--font-mono); font-size: 17px; font-weight: 700; color: var(--ledger); line-height: 1.1; }
+.inv-amount .l { font-size: 9.5px; color: var(--text-faint); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
+.inv-amount.is-pending .v { font-size: 12px; color: var(--text-faint); font-family: var(--font-body); font-weight: 500; font-style: italic; }
+.inv-company-chip { font-size: 11px; color: var(--text-dim); background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 20px; padding: 5px 11px; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inv-visit-btn { display: block; text-align: center; padding: 11px; border-radius: var(--radius-sm); background: var(--bg-elevated); border: 1px solid var(--line-strong); color: var(--text); font-size: 12.5px; font-weight: 600; text-decoration: none; transition: border-color .2s var(--ease), color .2s var(--ease); }
+.inv-visit-btn:hover { border-color: var(--steel); color: var(--steel); }
+
+/* --- пустое состояние / ошибка --- */
+.inv-empty { text-align: center; padding: 40px 20px; color: var(--text-faint); font-size: 13px; background: var(--bg-card); border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); }
+.inv-empty .big { display: block; font-size: 30px; margin-bottom: 12px; color: var(--text-faint); }
+.inv-empty .big .icon { width: 1em; height: 1em; }
+
+/* --- скелетоны загрузки --- */
+.inv-skel { border-radius: 19px; border: 1px solid var(--line); background: var(--bg-card); padding: 20px; overflow: hidden; position: relative; }
+.inv-skel::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.045) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.6s ease-in-out infinite;
+}
+@keyframes skelShimmer { 0% { background-position: 140% 0; } 100% { background-position: -40% 0; } }
+.inv-skel-row { display: flex; align-items: center; gap: 14px; }
+.inv-skel-avatar { width: 60px; height: 60px; border-radius: 16px; background: var(--bg-elevated); flex-shrink: 0; }
+.inv-skel-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.inv-skel-line { height: 12px; border-radius: 6px; background: var(--bg-elevated); width: 70%; }
+.inv-skel-line.short { width: 40%; }
+.inv-skel-block { height: 14px; border-radius: 6px; background: var(--bg-elevated); margin-top: 16px; width: 100%; }
+.inv-skel-block.w2 { width: 60%; }
+
+/* ============ АДМИН-ПАНЕЛЬ (investorsAdmin.js) ============ */
+
+.inv-admin-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  margin-bottom: 8px;
+  user-select: none;
+  transition: border-color .2s var(--ease);
+}
+.inv-admin-toggle:hover { border-color: var(--line-strong); }
+
+.inv-admin-toggle .label {
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.inv-admin-toggle .chev {
+  color: var(--text-faint);
+  transition: transform 0.2s var(--ease);
+}
+
+.inv-admin-toggle.open .chev {
+  transform: rotate(180deg);
+}
+
+.inv-admin-panel {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 4px 20px;
+}
+
+.inv-admin-panel.open {
+  display: flex;
+}
+
+.inv-admin-empty {
+  color: var(--text-faint);
+  font-size: 13px;
+  padding: 16px 4px;
+  text-align: center;
+}
+
+.inv-admin-add-btn { padding: 11px 16px; border-radius: var(--radius-sm); background: var(--gradient-ledger); color: var(--on-ledger); border: none; font-weight: 700; font-size: 13px; cursor: pointer; }
+.inv-admin-list { display: flex; flex-direction: column; gap: 8px; }
+.inv-admin-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.inv-admin-icon-btn { background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 6px; font-size: 15px; }
+.inv-admin-icon-btn:hover { color: var(--text); }
+.row-actions { display: flex; gap: 4px; }
+
+.inv-modal { position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); }
+.inv-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.inv-modal-close { background: none; border: none; color: var(--text-faint); font-size: 18px; cursor: pointer; }
+.inv-modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+.inv-form-grid { display: flex; flex-direction: column; gap: 12px; }
+.inv-form-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-dim); }
+.inv-form-hint { font-size: 10.5px; color: var(--text-faint); }
+.inv-form-error { color: var(--danger-text); background: var(--danger-dim); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 12px; }
+.inv-form-photo { display: flex; align-items: center; gap: 12px; }
+.inv-form-photo-btn { padding: 9px 14px; border-radius: var(--radius-sm); background: var(--bg-elevated); border: 1px solid var(--line-strong); color: var(--text); font-size: 12px; cursor: pointer; }
+.inv-save-btn { flex: 1; padding: 12px; border-radius: var(--radius-sm); background: var(--gradient-ledger); color: var(--on-ledger); border: none; font-weight: 700; cursor: pointer; }
+.inv-cancel-btn { padding: 12px 18px; border-radius: var(--radius-sm); background: var(--bg-elevated); border: 1px solid var(--line-strong); color: var(--text); cursor: pointer; }
+.inv-status-toggle { display: flex; gap: 6px; }
+
+/* ---------- Раунд 8, модуль 5: панель аудит-лога ---------- */
+
+.inv-audit-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.inv-audit-filters select {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+.inv-audit-list { display: flex; flex-direction: column; gap: 8px; }
+
+.inv-audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.inv-audit-table th,
+.inv-audit-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.inv-audit-table th {
+  color: var(--text-faint);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inv-audit-table td {
+  color: var(--text-dim);
+}
+
+.inv-audit-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.inv-audit-page-label {
+  color: var(--text-faint);
+  font-size: 12px;
+}

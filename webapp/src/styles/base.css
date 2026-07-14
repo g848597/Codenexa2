@@ -1,0 +1,153 @@
+*{box-sizing:border-box; margin:0; padding:0;}
+@media (prefers-reduced-motion: reduce){ *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;} }
+
+html,body{background:var(--bg); color:var(--text); font-family:var(--font-body); -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;}
+body{max-width:480px; margin:0 auto; min-height:100vh; position:relative; padding-bottom:96px;}
+::selection{background:var(--ledger-dim); color:var(--ledger);}
+
+.ambient{position:fixed; inset:0; z-index:-1; max-width:480px; margin:0 auto;
+  background:
+    radial-gradient(ellipse 640px 320px at 15% -12%, rgba(0,217,160,0.10), transparent 62%),
+    radial-gradient(ellipse 540px 420px at 95% 14%, rgba(91,157,255,0.075), transparent 60%),
+    radial-gradient(ellipse 420px 320px at 30% 92%, rgba(240,169,58,0.045), transparent 65%),
+    var(--bg);
+}
+.ambient::after{content:''; position:absolute; inset:0; opacity:var(--grain-opacity); mix-blend-mode:overlay; pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* моноширинные/цифровые значения не должны "прыгать" при обновлении — премиальные
+   финтех-интерфейсы всегда выравнивают цифры по фиксированной ширине */
+.font-mono, [class*="metric-value"], [class*="fw-count-num"], .p-label{font-variant-numeric:tabular-nums;}
+
+/* Единая иконочная система (замена эмодзи), см. utils/icons.js.
+   Иконка — inline-SVG, наследует цвет (stroke=currentColor) и размер шрифта
+   родителя (1em), поэтому вставляется вместо emoji без доп. обёрток. */
+.icon{display:inline-block; width:1em; height:1em; vertical-align:-0.15em; flex-shrink:0; stroke:currentColor;}
+.icon--sm{width:0.85em; height:0.85em;}
+.icon--lg{width:1.3em; height:1.3em; vertical-align:-0.2em;}
+.icon--ledger{color:var(--ledger);}
+.icon--steel{color:var(--steel);}
+.icon--amber{color:var(--amber);}
+.icon--danger{color:var(--danger-text);}
+
+header{position:sticky; top:0; z-index:20; background:rgba(10,11,13,0.72); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%); border-bottom:1px solid var(--line);}
+.header-inner{padding:16px 20px 12px;}
+.brand-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+.header-right{display:flex; align-items:center; gap:8px;}
+.lang-toggle{font-family:var(--font-mono); font-size:11px; font-weight:600; letter-spacing:0.4px; color:var(--text-dim); background:var(--bg-card); border:1px solid var(--line-strong); border-radius:20px; padding:5px 11px; cursor:pointer; min-height:26px; transition:border-color .2s var(--ease), color .2s var(--ease), background .2s var(--ease);}
+.lang-toggle:hover{color:var(--text); border-color:rgba(0,217,160,0.4); background:var(--bg-elevated);}
+.lang-toggle:focus-visible, .tab:focus-visible, button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible{outline:2px solid var(--steel); outline-offset:2px;}
+
+.brand{display:flex; align-items:center; gap:9px;}
+.brand-mark{
+  width:28px; height:28px; border-radius:8px;
+  background:var(--gradient-ledger);
+  position:relative; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-weight:700; font-size:13px; color:var(--on-ledger);
+  box-shadow:var(--glow-ledger);
+}
+.brand-mark::after{content:''; position:absolute; inset:0; background:linear-gradient(135deg, rgba(255,255,255,0.35), transparent 55%);}
+.brand-name{font-family:var(--font-display); font-size:17.5px; font-weight:600; letter-spacing:0.1px;}
+
+.data-badge{font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:0.6px; color:var(--ledger); background:var(--ledger-dim); border:1px solid rgba(0,217,160,0.28); border-radius:20px; padding:4px 10px 4px 8px; display:flex; align-items:center; gap:5px;}
+.data-badge::before{content:''; width:5px; height:5px; border-radius:50%; background:var(--ledger); box-shadow:0 0 7px 1px var(--ledger); animation:pulseDot 2.4s ease-in-out infinite;}
+@keyframes pulseDot{0%,100%{opacity:1;} 50%{opacity:.45;}}
+
+/* Раньше flex:1 0 auto делил ширину поровну между 5 табами — на узких экранах
+   (360–390px) это сжимало длинные лейблы ("Дорожная карта") до нечитаемых
+   тап-зон. Теперь табы естественной ширины и сами скроллятся, ни один
+   лейбл не обрезается и не сжимается. */
+.tabs{display:flex; gap:4px; background:var(--bg-elevated); border:1px solid var(--line); border-radius:var(--radius-md); padding:3px; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;}
+.tabs::-webkit-scrollbar{display:none;}
+.tabs::after{content:''; flex:0 0 2px;} /* небольшой запас справа, чтобы последний таб не прилипал к краю */
+.tab{flex:0 0 auto; text-align:center; padding:8px 14px; font-size:12.5px; font-weight:500; color:var(--text-dim); border-radius:9px; cursor:pointer; transition:all .25s var(--ease); user-select:none; white-space:nowrap; min-height:32px; display:flex; align-items:center;}
+.tab.active{background:var(--bg-card); color:var(--text); box-shadow:0 1px 0 var(--line-strong) inset, 0 1px 8px rgba(0,0,0,0.25);}
+.tab:active{transform:scale(.96);}
+
+button{transition:transform .15s var(--ease);}
+button:active{transform:scale(.96);}
+
+main{padding:22px 20px 0;}
+section.view{display:none; animation:fadeIn .4s var(--ease-out);}
+section.view.active{display:block;}
+@keyframes fadeIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+
+.hero{margin-bottom:28px; position:relative;}
+.hero-eyebrow{font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-faint); margin-bottom:10px; display:flex; align-items:center; gap:8px;}
+.hero-eyebrow::before{content:''; width:14px; height:1px; background:var(--ledger); display:inline-block;}
+.hero h1{font-family:var(--font-display); font-size:29px; line-height:1.18; font-weight:500; letter-spacing:-0.3px;}
+.hero h1 em{font-style:normal; color:var(--ledger); background:linear-gradient(135deg, var(--ledger), #5ce8bd); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;}
+.hero p{color:var(--text-dim); font-size:14px; line-height:1.6; margin-top:12px; max-width:38ch;}
+
+.honesty-note{margin-top:16px; display:flex; gap:10px; padding:13px 15px; background:var(--gradient-surface), var(--bg-card); border:1px solid var(--line); border-radius:var(--radius-md);}
+.honesty-note .dot{width:6px; height:6px; margin-top:6px; border-radius:50%; background:var(--amber); box-shadow:0 0 6px var(--amber); flex-shrink:0;}
+.honesty-note p{color:var(--text-dim); font-size:12.5px; line-height:1.5; margin:0;}
+.honesty-note b{color:var(--text);}
+
+.muted-lead{color:var(--text-dim); font-size:13px; line-height:1.55; margin-bottom:16px;}
+
+.section-head{display:flex; align-items:baseline; justify-content:space-between; margin:34px 0 15px; position:relative;}
+.section-head h2{font-family:var(--font-display); font-size:19.5px; font-weight:500; letter-spacing:-0.1px;}
+.section-head span{font-family:var(--font-mono); font-size:11px; color:var(--text-faint);}
+
+footer{margin-top:38px; padding:20px 20px 28px; text-align:center; border-top:1px solid var(--line);}
+footer p{font-family:var(--font-mono); font-size:10px; color:var(--text-faint); letter-spacing:0.5px;}
+.footer-legal-link{display:inline-block; margin-top:10px; background:none; border:none; font-family:var(--font-body); font-size:11px; color:var(--text-faint); text-decoration:underline; text-underline-offset:2px; cursor:pointer; padding:6px; transition:color .2s var(--ease);}
+.footer-legal-link:hover{color:var(--text-dim);}
+
+/* progress indicator (Module 2) */
+.progress-strip{display:flex; align-items:center; gap:10px; background:var(--gradient-surface), var(--bg-card); border:1px solid var(--line); border-radius:var(--radius-md); padding:13px 15px; margin-top:16px; box-shadow:var(--shadow-card);}
+.progress-strip .p-track{flex:1; height:5px; background:rgba(255,255,255,0.06); border-radius:4px; overflow:hidden;}
+.progress-strip .p-fill{height:100%; background:linear-gradient(90deg, var(--ledger), var(--steel)); border-radius:4px; transition:width .5s var(--ease-out); box-shadow:0 0 10px rgba(0,217,160,0.4);}
+.progress-strip .p-label{font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); white-space:nowrap;}
+
+/* empty state for brand-new user */
+.empty-state{text-align:center; padding:36px 20px; background:var(--gradient-surface), var(--bg-card); border:1px dashed var(--line-strong); border-radius:var(--radius-lg); margin-bottom:16px; position:relative; overflow:hidden;}
+.empty-state h3{font-family:var(--font-display); font-size:17.5px; font-weight:600; margin-bottom:8px;}
+.empty-state p{font-size:12.5px; color:var(--text-dim); line-height:1.5; max-width:32ch; margin:0 auto 18px;}
+.empty-state button{font-family:var(--font-body); font-weight:600; font-size:13px; color:var(--on-ledger); background:var(--gradient-ledger); border:none; padding:12px 22px; border-radius:var(--radius-sm); cursor:pointer; box-shadow:var(--glow-ledger); transition:transform .2s var(--ease-spring), box-shadow .2s var(--ease);}
+.empty-state button:hover{box-shadow:0 0 0 1px rgba(0,217,160,0.25), 0 12px 32px -8px rgba(0,217,160,0.5);}
+
+/* Раунд 8 (см. CHANGES_ROUND8.md, модуль 7): единый спиннер для
+   полноэкранных модулей (docsApp.js `da-*`, sportApp.js `sa-*`,
+   accountApp.js `acc-*` — общий JS-хелпер теперь в utils/loadingState.js).
+   Правило написано один раз через селектор по атрибуту class$="-spinner",
+   а не три раза под каждый префикс. */
+[class$="-loading"] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 52px 16px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+[class$="-spinner"] {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2.5px solid var(--line);
+  border-top-color: var(--ledger, var(--accent, #999));
+  animation: codenexa-spin 0.8s linear infinite;
+}
+
+@keyframes codenexa-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+[class$="-error"] {
+  text-align: center;
+  padding: 34px 16px;
+  color: var(--text-dim);
+}
+
+[class$="-error"] p {
+  margin-bottom: 14px;
+  font-size: 13.5px;
+}

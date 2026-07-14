@@ -1,0 +1,80 @@
+version: "3.9"
+
+# Локальная разработка без завязки на живой Supabase (аудит, раздел 9, п.7).
+# Продакшн по-прежнему деплоится на Railway/любой Docker-хостинг с
+# DATABASE_URL, указывающим на Supabase — этот compose только для локали.
+#
+# Запуск:
+#   docker compose up --build
+# Приложение: http://localhost:8000
+# Postgres:   localhost:5432 (codenexa/codenexa/codenexa)
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: codenexa
+      POSTGRES_PASSWORD: codenexa
+      POSTGRES_DB: codenexa
+    ports:
+      - "5432:5432"
+    volumes:
+      - codenexa_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codenexa -d codenexa"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Опционален: без него приложение работает как раньше (rate-limit в памяти
+  # процесса). Нужен только чтобы локально проверить многопроцессный сценарий
+  # (REDIS_URL задан ниже по умолчанию — если сервис не нужен, просто не
+  # запускайте `redis` и уберите/очистите REDIS_URL у `app`).
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      ENV: development
+      PORT: 8000
+      DATABASE_URL: postgresql://codenexa:codenexa@db:5432/codenexa
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-do-not-use-in-production}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      CRYPTOBOT_API_TOKEN: ${CRYPTOBOT_API_TOKEN:-}
+      CRYPTOBOT_NETWORK: ${CRYPTOBOT_NETWORK:-mainnet}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-}
+      YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET:-}
+      YANDEX_REDIRECT_URI: ${YANDEX_REDIRECT_URI:-}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      ADMIN_TELEGRAM_IDS: ${ADMIN_TELEGRAM_IDS:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - codenexa_uploads:/srv/data/uploads
+
+volumes:
+  codenexa_pgdata:
+  codenexa_uploads:
