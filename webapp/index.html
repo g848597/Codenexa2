@@ -40,13 +40,17 @@
         </div>
         <div class="tabs" id="tabs">
           <div class="tab active" data-view="dashboard">Дэшборд</div>
+          <div class="tab" data-view="investors">Инвесторы</div>
+          <div class="tab" data-view="partners">Партнёры</div>
+          <div class="tab" data-view="trust">Доверие</div>
+          <div class="tab" data-view="ecosystem">Экосистема</div>
           <div class="tab" data-view="account">Аккаунт</div>
         </div>
       </div>
     </header>
 
     <main>
-      <!-- Дэшборд: единая прокручиваемая страница со всеми секциями -->
+      <!-- Дэшборд: только приветствие и список продуктов -->
       <section id="view-dashboard" class="view active">
         <div id="onboarding-root"></div>
 
@@ -57,6 +61,35 @@
         </div>
         <div id="ledger-root" class="ledger-list"></div>
 
+        <footer>
+          <p>CODENEXA GROWTH CONSOLE · ИЮЛЬ 2026</p>
+          <button class="footer-legal-link" id="legal-link" type="button">Политика конфиденциальности · Условия использования</button>
+        </footer>
+      </section>
+
+      <!-- Отдельная вкладка: Инвесторы -->
+      <section id="view-investors" class="view">
+        <div id="investors-root" class="investors-section"></div>
+      </section>
+
+      <!-- Отдельная вкладка: Партнёры -->
+      <section id="view-partners" class="view">
+        <div class="section-head">
+          <h2 id="partners-title">Партнёры</h2>
+        </div>
+        <div id="partners-root"></div>
+      </section>
+
+      <!-- Отдельная вкладка: Доверие -->
+      <section id="view-trust" class="view">
+        <div class="section-head">
+          <h2 id="trust-title">Доверие</h2>
+        </div>
+        <div id="trust-root"></div>
+      </section>
+
+      <!-- Отдельная вкладка: Экосистема (карта продуктов + дорожная карта) -->
+      <section id="view-ecosystem" class="view">
         <div class="section-head">
           <h2 id="flywheel-title">Экосистема</h2>
         </div>
@@ -66,23 +99,6 @@
           <h2 id="roadmap-title">Дорожная карта</h2>
         </div>
         <div id="timeline-root" class="timeline"></div>
-
-        <div class="section-head">
-          <h2 id="partners-title">Партнёры</h2>
-        </div>
-        <div id="partners-root"></div>
-
-        <div class="section-head">
-          <h2 id="trust-title">Доверие</h2>
-        </div>
-        <div id="trust-root"></div>
-
-        <div id="investors-root" class="investors-section"></div>
-
-        <footer>
-          <p>CODENEXA GROWTH CONSOLE · ИЮЛЬ 2026</p>
-          <button class="footer-legal-link" id="legal-link" type="button">Политика конфиденциальности · Условия использования</button>
-        </footer>
       </section>
 
       <!-- Полноэкранные разделы — main.js/компоненты сами наполняют их через document.getElementById -->

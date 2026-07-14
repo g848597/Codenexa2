@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: codenexa
+          POSTGRES_PASSWORD: codenexa
+          POSTGRES_DB: codenexa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U codenexa -d codenexa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://codenexa:codenexa@localhost:5432/codenexa
+      REDIS_URL: redis://localhost:6379/0
+      ENV: development
+      JWT_SECRET: ci-only-secret-do-not-use-in-production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check app tests
+
+      - name: Compile check
+        run: python -m py_compile $(git ls-files 'app/**/*.py')
+
+      - name: Run tests
+        run: pytest -v
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webapp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint (eslint)
+        run: npm run lint --if-present
+
+      - name: Format check (prettier)
+        run: npm run format:check --if-present
