@@ -149,6 +149,7 @@ export function openSportApp() {
   root = document.getElementById('view-sport-app');
   screenStack = [{ name: 'home' }];
   homeState = { popular: null, error: null };
+  homeLive = { matches: null, loaded: false };
   searchState = { query: '', results: null, loading: false, error: null };
   render();
   refreshLiveBadge();
@@ -228,6 +229,7 @@ function wireCommon() {
 // =========================================================================
 
 let homeState = { popular: null, error: null };
+let homeLive = { matches: null, loaded: false };
 
 function renderHome() {
   if (!homeState.popular && !homeState.error) {
@@ -251,38 +253,67 @@ function renderHome() {
     ? `<div class="sa-hint-block">Источник живых данных (api-football) пока не подключён на сервере — показываем команды по названиям без гербов и статистики. Как только появится ключ API, здесь честно появятся реальные данные.</div>`
     : '';
 
+  let liveSection;
+  if (!homeLive.loaded) {
+    liveSection = '';
+  } else if (homeLive.matches && homeLive.matches.length) {
+    liveSection = `
+    <div class="sa-section-head"><h2>Матчи сейчас <span class="sa-live-dot"></span></h2></div>
+    <div class="sa-fixture-list">${homeLive.matches.slice(0, 3).map(fixtureRowHTML).join('')}</div>`;
+  } else if (apiConfigured !== false) {
+    liveSection = `<div class="sa-empty-mini">Live-матчей прямо сейчас нет — загляните позже, табло обновляется автоматически.</div>`;
+  } else {
+    liveSection = '';
+  }
+
   return `
-  <div class="sa-hero">
-    <div class="sa-hero-title">Команды и матчи в одном месте</div>
-    <div class="sa-hero-sub">Найдите клуб, посмотрите форму, ближайший матч и live-счёт — без переключения между источниками.</div>
+  <div class="sa-hero2">
+    <div class="sa-hero2-badge">${icon('ball')} Живые данные, без прогнозов "на глаз"</div>
+    <h1 class="sa-hero2-title">Команды, live-счёт<br>и статистика — в одном месте</h1>
+    <p class="sa-hero2-sub">Ищите клуб, смотрите форму и ближайшие матчи по реальным данным api-football — без выдуманных коэффициентов.</p>
     <div class="sa-search-row">
       <input type="text" class="sa-search-input" placeholder="Найти команду… например, Реал Мадрид" data-search-input>
       <button class="sa-search-btn" data-search-go>Найти</button>
     </div>
   </div>
 
-  <button class="sa-tile-live" data-go-live>
-    <div class="sa-tile-live-left">
-      <span class="sa-live-dot"></span>
-      <div>
-        <div class="sa-tile-live-title">Матчи сейчас</div>
-        <div class="sa-tile-live-sub">Смотреть live-табло</div>
-      </div>
-    </div>
-    <span class="sa-tile-live-count" data-live-count>${liveCount}</span>
-  </button>
+  <div class="sa-action-row">
+    <button class="sa-action-btn sa-action-primary" data-go-live>${icon('zap')} Live-матчи</button>
+    <button class="sa-action-btn" data-scroll-teams>${icon('trophy')} Топ клубы</button>
+    <button class="sa-action-btn" data-open-pro>${icon('creditCard')} PRO-тарифы</button>
+  </div>
+
+  <div class="sa-tile-grid">
+    <button class="sa-tile" data-scroll-teams>${icon('trophy')}<span>Топ клубы</span><em>Аналитика</em></button>
+    <button class="sa-tile" data-go-live>${icon('calendar')}<span>Live сейчас</span><em data-live-count>${liveCount}</em></button>
+    <button class="sa-tile" data-focus-search>${icon('search')}<span>Поиск</span><em>Любой клуб</em></button>
+    <button class="sa-tile" data-open-pro>${icon('layers')}<span>PRO-тарифы</span><em>Подписка</em></button>
+    <button class="sa-tile sa-tile-exit" data-sa-exit>${icon('globe')}<span>Экосистема</span><em>CodeNexa</em></button>
+  </div>
+
+  ${liveSection}
 
   ${configuredHint}
 
-  <div class="sa-section-head"><h2>Популярные команды</h2></div>
+  <div class="sa-section-head"><h2 id="sa-teams-anchor">Популярные команды</h2></div>
   ${grid}`;
 }
 
 async function loadHomeAsync() {
   try {
-    const [popularData, statusData] = await Promise.all([sportApi.popularTeams(), sportApi.status()]);
+    const [popularData, statusData, liveData] = await Promise.all([
+      sportApi.popularTeams(),
+      sportApi.status(),
+      sportApi.liveMatches().catch(() => null),
+    ]);
     apiConfigured = statusData.configured;
     homeState = { popular: popularData.teams, error: null };
+    if (liveData) {
+      homeLive = { matches: liveData.matches, loaded: true };
+      liveCount = (liveData.matches || []).length;
+    } else {
+      homeLive = { matches: null, loaded: true };
+    }
     render();
   } catch (e) {
     homeState = { popular: null, error: e.message };
@@ -313,6 +344,25 @@ function wireHome() {
 
   const liveBtn = root.querySelector('[data-go-live]');
   if (liveBtn) liveBtn.addEventListener('click', () => { haptic('light'); push('live'); });
+
+  const focusSearchBtn = root.querySelector('[data-focus-search]');
+  if (focusSearchBtn) focusSearchBtn.addEventListener('click', () => { haptic('light'); input?.focus(); input?.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+
+  const scrollTeamsBtn = root.querySelectorAll('[data-scroll-teams]');
+  scrollTeamsBtn.forEach((btn) => btn.addEventListener('click', () => {
+    haptic('light');
+    document.getElementById('sa-teams-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+
+  // Реальные тарифы/оплата уже реализованы в личном кабинете (см.
+  // accountApp.js, billingHTML() — там же настоящие цены и checkout) —
+  // здесь просто переводим на ту же вкладку, а не дублируем логику оплаты.
+  const proBtn = root.querySelector('[data-open-pro]');
+  if (proBtn) proBtn.addEventListener('click', () => {
+    haptic('light');
+    closeSportApp();
+    document.querySelector('.tab[data-view="account"]')?.click();
+  });
 }
 
 // =========================================================================
