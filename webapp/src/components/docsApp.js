@@ -68,6 +68,7 @@ export function openDocsApp() {
   root = document.getElementById('view-docs-app');
   screenStack = [{ name: 'home' }];
   cache = { templatesByCategory: null, profile: null, billing: null };
+  homeState = { catLoading: false, catError: null, docs: null, docsTotal: 0, docsLoading: false, docsError: null };
   render();
 }
 
@@ -127,27 +128,280 @@ function wireCommon() {
 // =========================================================================
 // Экран: Home
 // =========================================================================
+//
+// Полностью переработанный премиальный лендинг модуля (см. CHANGES —
+// редизайн главного экрана AI Docs). Архитектурно ничего не меняет: тот же
+// стек экранов, те же da-* экраны дальше по стеку (categories/templates/...),
+// просто "home" теперь состоит из нескольких секций, часть из которых
+// подгружает реальные данные (категории шаблонов, последние документы),
+// а не выдумывает цифры.
+
+let homeState = { catLoading: false, catError: null, docs: null, docsTotal: 0, docsLoading: false, docsError: null };
+
+function categoryIcon(title) {
+  const t = (title || '').toLowerCase();
+  if (/догов/.test(t)) return 'fileEdit';
+  if (/юр|нда|оферт|полит/.test(t)) return 'scale';
+  if (/hr|кадр|сотруд|труд/.test(t)) return 'users';
+  if (/финанс|счет|счёт|оплат|инвойс|акт/.test(t)) return 'receipt';
+  if (/маркет|реклам|презент/.test(t)) return 'sparkles';
+  if (/бизнес|компан|тендер/.test(t)) return 'briefcase';
+  return 'fileText';
+}
+
+function renderHeroIllustration() {
+  // Лёгкая декоративная SVG-сцена: парящие документы + печать + подпись.
+  // Никаких внешних ассетов — чистый inline SVG в токенах проекта, анимация
+  // на чистом CSS (см. docsHome.css: dh-doc-float/dh-glow-pulse).
+  return `
+  <div class="dh-hero-illustration" aria-hidden="true">
+    <svg viewBox="0 0 340 96" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="dhDocA" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="var(--ledger)"/><stop offset="1" stop-color="var(--steel)"/>
+        </linearGradient>
+        <linearGradient id="dhDocB" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="var(--violet)"/><stop offset="1" stop-color="var(--steel)"/>
+        </linearGradient>
+      </defs>
+      <ellipse class="dh-glow-pulse" cx="170" cy="50" rx="120" ry="30" fill="url(#dhDocA)" opacity="0.14"/>
+      <g transform="translate(30,18)">
+        <g class="dh-doc-float" style="--r:-6deg">
+          <rect width="46" height="60" rx="5" fill="var(--bg-elevated)" stroke="url(#dhDocA)" stroke-width="1.4"/>
+          <rect x="9" y="12" width="28" height="3" rx="1.5" fill="var(--text-faint)"/>
+          <rect x="9" y="20" width="28" height="3" rx="1.5" fill="var(--text-faint)" opacity=".6"/>
+          <rect x="9" y="28" width="18" height="3" rx="1.5" fill="var(--text-faint)" opacity=".4"/>
+          <text x="9" y="48" font-family="var(--font-mono)" font-size="9" fill="var(--ledger)">PDF</text>
+        </g>
+      </g>
+      <g transform="translate(145,6)">
+        <g class="dh-doc-float d2" style="--r:4deg">
+          <rect width="52" height="66" rx="5" fill="var(--bg-elevated)" stroke="url(#dhDocB)" stroke-width="1.4"/>
+          <rect x="10" y="13" width="32" height="3" rx="1.5" fill="var(--text-faint)"/>
+          <rect x="10" y="21" width="32" height="3" rx="1.5" fill="var(--text-faint)" opacity=".6"/>
+          <rect x="10" y="29" width="20" height="3" rx="1.5" fill="var(--text-faint)" opacity=".4"/>
+          <path d="M12 50 q6 -8 12 0 t12 0" stroke="var(--violet)" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+          <text x="10" y="60" font-family="var(--font-mono)" font-size="9" fill="var(--violet)">DOCX</text>
+        </g>
+      </g>
+      <g transform="translate(250,22)">
+        <g class="dh-doc-float d3" style="--r:-3deg">
+          <circle cx="24" cy="24" r="23" fill="none" stroke="var(--amber)" stroke-width="1.6" opacity=".8"/>
+          <circle cx="24" cy="24" r="16" fill="none" stroke="var(--amber)" stroke-width="1.2" opacity=".55"/>
+          <text x="24" y="27" font-family="var(--font-mono)" font-size="7.5" fill="var(--amber)" text-anchor="middle">СВЕРЕНО</text>
+        </g>
+      </g>
+    </svg>
+  </div>`;
+}
 
 function renderHome() {
+  // Категории — реальные данные API (тот же кэш, что и экран "categories").
+  if (!cache.templatesByCategory && !homeState.catLoading && !homeState.catError) {
+    homeState.catLoading = true;
+    loadHomeCategories();
+  }
+  // Последние документы пользователя — тоже реальные данные (listDocuments).
+  if (!homeState.docs && !homeState.docsLoading && !homeState.docsError) {
+    homeState.docsLoading = true;
+    loadHomeRecentDocs();
+  }
+
+  const totalTemplates = cache.templatesByCategory
+    ? cache.templatesByCategory.reduce((sum, c) => sum + c.templates.length, 0)
+    : null;
+
   return `
-  <div class="da-hero">
-    <div class="da-hero-title">Документы за минуту</div>
-    <div class="da-hero-sub">Шаблоны, AI-конструктор и произвольные документы — с PDF/DOCX на выходе.</div>
-  </div>
-  <div class="da-tiles">
-    <button class="da-tile" data-go="categories"><span class="da-tile-icon">${icon('fileText')}</span><span>Создать документ</span><span class="da-tile-hint">По готовому шаблону</span></button>
-    <button class="da-tile" data-go="ai"><span class="da-tile-icon">${icon('bot')}</span><span>AI-конструктор</span><span class="da-tile-hint">Опишите своими словами</span></button>
-    <button class="da-tile" data-go="custom"><span class="da-tile-icon">${icon('puzzle')}</span><span>Произвольный документ</span><span class="da-tile-hint">Когда шаблона нет</span></button>
-    <button class="da-tile" data-go="mydocs"><span class="da-tile-icon">${icon('folder')}</span><span>Мои документы</span><span class="da-tile-hint">История и повтор</span></button>
-    <button class="da-tile" data-go="profile"><span class="da-tile-icon">${icon('user')}</span><span>Профиль</span><span class="da-tile-hint">Автоподстановка данных</span></button>
-    <button class="da-tile" data-go="tariffs"><span class="da-tile-icon">${icon('star')}</span><span>Тарифы</span><span class="da-tile-hint">FREE / PRO / BUSINESS</span></button>
+  <section class="dh-hero dh-fade dh-fade-1">
+    <div class="dh-hero-eyebrow">${icon('sparkles')} AI Docs · CodeNexa</div>
+    <h1 class="dh-hero-title">Документы <em>за минуту</em>, а не за день</h1>
+    <p class="dh-hero-sub">Готовые шаблоны, AI-конструктор по описанию и произвольные документы — на выходе всегда чистый PDF или DOCX.</p>
+    ${renderHeroIllustration()}
+    <div class="dh-hero-actions">
+      <button class="dh-btn-primary" data-go="categories">${icon('fileText')} Создать документ</button>
+      <button class="dh-btn-secondary" data-go="ai">${icon('bot')} AI-конструктор — опишите своими словами</button>
+      <button class="dh-hero-link" data-go="categories">Смотреть все шаблоны ${icon('arrowRight')}</button>
+    </div>
+  </section>
+
+  <section class="dh-section dh-fade dh-fade-2">
+    <div class="dh-section-head"><h2>Быстрый старт</h2></div>
+    <div class="dh-quick">
+      <button class="dh-card" data-go="categories">
+        <span class="dh-card-icon">${icon('fileText')}</span>
+        <span class="dh-card-title">Создать документ</span>
+        <span class="dh-card-hint">По готовому шаблону</span>
+      </button>
+      <button class="dh-card" data-go="ai">
+        <span class="dh-card-icon violet">${icon('bot')}</span>
+        <span class="dh-card-title">AI-конструктор</span>
+        <span class="dh-card-hint">Опишите своими словами</span>
+      </button>
+      <button class="dh-card" data-go="custom">
+        <span class="dh-card-icon steel">${icon('puzzle')}</span>
+        <span class="dh-card-title">Произвольный документ</span>
+        <span class="dh-card-hint">Когда шаблона нет</span>
+      </button>
+      <button class="dh-card" data-go="mydocs">
+        <span class="dh-card-icon">${icon('folder')}</span>
+        <span class="dh-card-title">Мои документы</span>
+        <span class="dh-card-hint">История и повтор</span>
+      </button>
+      <button class="dh-card" data-go="profile">
+        <span class="dh-card-icon amber">${icon('user')}</span>
+        <span class="dh-card-title">Профиль</span>
+        <span class="dh-card-hint">Автоподстановка данных</span>
+      </button>
+      <button class="dh-card" data-go="tariffs">
+        <span class="dh-card-icon violet">${icon('star')}</span>
+        <span class="dh-card-title">Тарифы</span>
+        <span class="dh-card-hint">FREE / PRO / BUSINESS</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="dh-section dh-fade dh-fade-3">
+    <div class="dh-section-head">
+      <div><h2>Разделы документов</h2><p>Реальные категории и шаблоны вашего аккаунта</p></div>
+      ${cache.templatesByCategory ? `<button class="dh-section-more" data-go="categories">Все ${icon('arrowRight')}</button>` : ''}
+    </div>
+    ${renderHomeCategories()}
+  </section>
+
+  <section class="dh-section dh-fade dh-fade-4">
+    <div class="dh-section-head">
+      <div><h2>Недавние документы</h2></div>
+      ${homeState.docs && homeState.docs.length ? `<button class="dh-section-more" data-go="mydocs">Все (${homeState.docsTotal}) ${icon('arrowRight')}</button>` : ''}
+    </div>
+    ${renderHomeRecentDocs()}
+  </section>
+
+  <section class="dh-section dh-fade dh-fade-5">
+    <div class="dh-section-head"><h2>Возможности AI Docs</h2></div>
+    <div class="dh-features">
+      <div class="dh-feature">${icon('download')} Экспорт в PDF и DOCX</div>
+      <div class="dh-feature">${icon('zap')} Генерация за секунды</div>
+      <div class="dh-feature">${icon('bot')} AI-конструктор по описанию</div>
+      <div class="dh-feature">${icon('user')} Автоподстановка профиля</div>
+      <div class="dh-feature">${icon('layers')} Шаблоны для бизнеса и HR</div>
+      <div class="dh-feature">${icon('shieldCheck')} История и повтор документов</div>
+    </div>
+  </section>
+
+  <section class="dh-section dh-fade dh-fade-5" style="margin-bottom:8px">
+    <div class="dh-stats">
+      <div class="dh-stat"><div class="dh-stat-value">${totalTemplates !== null ? totalTemplates : '—'}</div><div class="dh-stat-label">Шаблонов</div></div>
+      <div class="dh-stat"><div class="dh-stat-value">${homeState.docs !== null ? homeState.docsTotal : '—'}</div><div class="dh-stat-label">Ваши документы</div></div>
+      <div class="dh-stat"><div class="dh-stat-value">3</div><div class="dh-stat-label">Тарифа</div></div>
+    </div>
+  </section>`;
+}
+
+function renderHomeCategories() {
+  if (homeState.catError) {
+    return `<div class="dh-empty-inline">${icon('alertTriangle')} ${esc(homeState.catError)}<br><button class="da-btn-secondary" data-retry-home-cats style="margin-top:10px">Повторить</button></div>`;
+  }
+  if (!cache.templatesByCategory) {
+    return `<div class="dh-cats">${['','',''].map(() => '<div class="dh-skel dh-skel-cat"></div>').join('')}</div>`;
+  }
+  const cats = cache.templatesByCategory.slice(0, 6);
+  if (!cats.length) return `<div class="dh-empty-inline">Пока нет доступных шаблонов.</div>`;
+  return `
+  <div class="dh-cats">
+    ${cats.map((c) => `
+      <button class="dh-cat-card" data-home-cat="${esc(c.code)}">
+        <span class="dh-cat-icon">${icon(categoryIcon(c.title))}</span>
+        <span class="dh-cat-body">
+          <span class="dh-cat-title">${esc(c.title)}</span>
+          <span class="dh-cat-count">${c.templates.length} ${c.templates.length === 1 ? 'шаблон' : 'шаблонов'}</span>
+        </span>
+        <span class="dh-cat-arrow">${icon('arrowRight')}</span>
+      </button>`).join('')}
   </div>`;
+}
+
+function renderHomeRecentDocs() {
+  if (homeState.docsError) {
+    return `<div class="dh-empty-inline">${icon('alertTriangle')} ${esc(homeState.docsError)}<br><button class="da-btn-secondary" data-retry-home-docs style="margin-top:10px">Повторить</button></div>`;
+  }
+  if (homeState.docs === null) {
+    return `<div class="dh-docs">${['',''].map(() => '<div class="dh-skel dh-skel-doc"></div>').join('')}</div>`;
+  }
+  if (!homeState.docs.length) {
+    return `<div class="dh-empty-inline">Пока нет созданных документов.<br><button class="dh-btn-primary" data-go="categories" style="margin-top:12px; display:inline-flex">Создать первый документ</button></div>`;
+  }
+  return `
+  <div class="dh-docs">
+    ${homeState.docs.map((d) => `
+      <button class="dh-doc-row" data-home-doc="${d.id}">
+        <span class="dh-doc-badge">${icon('fileText')}</span>
+        <span class="dh-doc-info">
+          <span class="dh-doc-title">${esc(d.title)}</span>
+          <span class="dh-doc-meta">${esc(d.templateTitle)} · ${new Date(d.createdAt).toLocaleDateString('ru-RU')}</span>
+        </span>
+        <span class="dh-cat-arrow">${icon('arrowRight')}</span>
+      </button>`).join('')}
+  </div>`;
+}
+
+async function loadHomeCategories() {
+  try {
+    await ensureTemplates();
+    homeState.catLoading = false;
+    render();
+  } catch (e) {
+    homeState.catLoading = false;
+    homeState.catError = e.message;
+    render();
+  }
+}
+
+async function loadHomeRecentDocs() {
+  try {
+    const data = await docsApi.listDocuments(1);
+    homeState.docs = (data.items || []).slice(0, 3);
+    homeState.docsTotal = data.total || 0;
+    homeState.docsLoading = false;
+    render();
+  } catch (e) {
+    homeState.docsLoading = false;
+    homeState.docsError = e.message;
+    render();
+  }
+}
+
+function attachRipple(el) {
+  el.addEventListener('click', (e) => {
+    const rect = el.getBoundingClientRect();
+    const span = document.createElement('span');
+    const size = Math.max(rect.width, rect.height) * 1.4;
+    span.className = 'dh-ripple';
+    span.style.width = span.style.height = `${size}px`;
+    span.style.left = `${(e.clientX ?? rect.left + rect.width / 2) - rect.left - size / 2}px`;
+    span.style.top = `${(e.clientY ?? rect.top + rect.height / 2) - rect.top - size / 2}px`;
+    el.style.position = el.style.position || 'relative';
+    el.appendChild(span);
+    setTimeout(() => span.remove(), 600);
+  });
 }
 
 function wireHome() {
   root.querySelectorAll('[data-go]').forEach((btn) => {
+    attachRipple(btn);
     btn.addEventListener('click', () => { haptic('light'); push(btn.dataset.go); });
   });
+  root.querySelectorAll('[data-home-cat]').forEach((btn) => {
+    attachRipple(btn);
+    btn.addEventListener('click', () => { haptic('light'); push('templates', { category: btn.dataset.homeCat }); });
+  });
+  root.querySelectorAll('[data-home-doc]').forEach((btn) => {
+    attachRipple(btn);
+    btn.addEventListener('click', () => { haptic('light'); push('mydoc-detail', { id: Number(btn.dataset.homeDoc) }); });
+  });
+  const retryCats = root.querySelector('[data-retry-home-cats]');
+  if (retryCats) retryCats.addEventListener('click', () => { homeState.catError = null; render(); });
+  const retryDocs = root.querySelector('[data-retry-home-docs]');
+  if (retryDocs) retryDocs.addEventListener('click', () => { homeState.docsError = null; render(); });
 }
 
 // =========================================================================

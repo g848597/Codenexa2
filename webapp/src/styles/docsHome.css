@@ -1,0 +1,147 @@
+/* =========================================================================
+   AI Docs — новый экран Home (dh-*)
+   Отдельный неймспейс, чтобы не задевать da-* классы, которыми пользуются
+   остальные экраны модуля (categories/templates/wizard/...).
+   ========================================================================= */
+
+.dh-fade{animation:dhFadeUp .5s var(--ease-out) both;}
+.dh-fade-1{animation-delay:.04s;} .dh-fade-2{animation-delay:.1s;} .dh-fade-3{animation-delay:.16s;}
+.dh-fade-4{animation-delay:.22s;} .dh-fade-5{animation-delay:.28s;}
+@keyframes dhFadeUp{from{opacity:0; transform:translateY(12px);} to{opacity:1; transform:translateY(0);}}
+
+/* --- Hero ------------------------------------------------------------- */
+
+.dh-hero{
+  position:relative; overflow:hidden; border-radius:20px; padding:24px 20px 22px;
+  background:
+    radial-gradient(120% 140% at 8% -18%, rgba(0,217,160,0.16), transparent 55%),
+    radial-gradient(110% 130% at 100% 0%, rgba(91,157,255,0.12), transparent 55%),
+    var(--gradient-surface), var(--bg-card);
+  border:1px solid var(--line); box-shadow:var(--shadow-card);
+}
+.dh-hero::before{
+  content:''; position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background-image:linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size:26px 26px; mask-image:radial-gradient(70% 70% at 30% 20%, #000, transparent);
+}
+.dh-hero-eyebrow{position:relative; display:inline-flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:var(--ledger); background:var(--ledger-dim); border:1px solid rgba(0,217,160,0.25); border-radius:20px; padding:4px 10px; margin-bottom:14px;}
+.dh-hero-eyebrow .icon{width:11px; height:11px;}
+.dh-hero-title{position:relative; font-family:var(--font-display); font-size:25px; line-height:1.16; font-weight:600; letter-spacing:-0.3px; margin-bottom:10px;}
+.dh-hero-title em{font-style:normal; background:linear-gradient(135deg, var(--ledger), var(--steel)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;}
+.dh-hero-sub{position:relative; font-size:13px; color:var(--text-dim); line-height:1.6; max-width:40ch; margin-bottom:20px;}
+
+.dh-hero-illustration{position:relative; height:96px; margin:2px 0 20px; display:flex; align-items:center; justify-content:center;}
+.dh-hero-illustration svg{position:absolute; inset:0; width:100%; height:100%; overflow:visible;}
+.dh-doc-float{animation:dhFloat 5.5s ease-in-out infinite;}
+.dh-doc-float.d2{animation-delay:.6s; animation-duration:6.2s;}
+.dh-doc-float.d3{animation-delay:1.2s; animation-duration:4.8s;}
+@keyframes dhFloat{0%,100%{transform:translateY(0) rotate(var(--r,0deg));} 50%{transform:translateY(-7px) rotate(var(--r,0deg));}}
+.dh-glow-pulse{animation:dhGlowPulse 3.6s ease-in-out infinite;}
+@keyframes dhGlowPulse{0%,100%{opacity:.55;} 50%{opacity:1;}}
+
+.dh-hero-actions{position:relative; display:flex; flex-direction:column; gap:9px;}
+.dh-btn-primary, .dh-btn-secondary{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  font-family:var(--font-body); font-weight:700; font-size:13.5px; padding:13px; border-radius:12px;
+  cursor:pointer; border:none; transition:transform .2s var(--ease-spring), box-shadow .2s var(--ease), filter .2s var(--ease);
+}
+.dh-btn-primary{background:var(--gradient-ledger); color:var(--on-ledger); box-shadow:var(--glow-ledger);}
+.dh-btn-primary:hover{filter:brightness(1.06); box-shadow:0 0 0 1px rgba(0,217,160,0.3), 0 14px 34px -10px rgba(0,217,160,0.55);}
+.dh-btn-secondary{background:var(--bg-elevated); color:var(--text); border:1px solid var(--line-strong);}
+.dh-btn-secondary:hover{border-color:rgba(143,123,255,0.45); color:var(--violet);}
+.dh-hero-link{position:relative; align-self:flex-start; margin-top:2px; font-size:12px; color:var(--text-faint); background:none; border:none; cursor:pointer; display:flex; align-items:center; gap:5px; transition:color .2s var(--ease);}
+.dh-hero-link:hover{color:var(--text-dim);}
+.dh-hero-link .icon{width:12px; height:12px;}
+
+/* --- Section headers ---------------------------------------------------- */
+
+.dh-section{margin-top:28px;}
+.dh-section-head{display:flex; align-items:flex-end; justify-content:space-between; gap:10px; margin-bottom:13px;}
+.dh-section-head h2{font-family:var(--font-display); font-size:16.5px; font-weight:600; letter-spacing:-0.1px;}
+.dh-section-head p{font-size:11.5px; color:var(--text-faint); margin-top:3px;}
+.dh-section-more{font-size:11.5px; color:var(--text-dim); background:none; border:none; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:4px; transition:color .2s var(--ease);}
+.dh-section-more:hover{color:var(--ledger);}
+.dh-section-more .icon{width:12px; height:12px;}
+
+/* --- Quick actions grid --------------------------------------------------- */
+
+.dh-quick{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.dh-card{
+  position:relative; overflow:hidden; text-align:left; padding:16px 14px; border-radius:14px;
+  background:var(--bg-card); border:1px solid var(--line); cursor:pointer;
+  transition:transform .22s var(--ease-spring), border-color .2s var(--ease), background .2s var(--ease), box-shadow .2s var(--ease);
+  display:flex; flex-direction:column; gap:2px;
+}
+.dh-card:hover{transform:translateY(-3px); border-color:var(--line-strong); background:var(--bg-elevated); box-shadow:var(--shadow-card-hover);}
+.dh-card:active{transform:translateY(-1px) scale(.98); transition-duration:.1s;}
+.dh-card-icon{
+  width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center;
+  background:var(--ledger-dim); color:var(--ledger); margin-bottom:10px; font-size:17px;
+  transition:transform .25s var(--ease-spring);
+}
+.dh-card:hover .dh-card-icon{transform:scale(1.08) rotate(-3deg);}
+.dh-card-icon.violet{background:var(--violet-dim); color:var(--violet);}
+.dh-card-icon.steel{background:var(--steel-dim); color:var(--steel);}
+.dh-card-icon.amber{background:var(--amber-dim); color:var(--amber);}
+.dh-card-title{font-size:13.5px; font-weight:600; color:var(--text);}
+.dh-card-hint{font-size:11px; color:var(--text-faint); margin-top:2px;}
+
+/* ripple */
+.dh-ripple{position:absolute; border-radius:50%; background:rgba(255,255,255,0.16); transform:scale(0); animation:dhRipple .55s var(--ease-out); pointer-events:none;}
+@keyframes dhRipple{to{transform:scale(2.6); opacity:0;}}
+
+/* --- Category cards (real data from API) --------------------------------- */
+
+.dh-cats{display:flex; flex-direction:column; gap:8px;}
+.dh-cat-card{
+  position:relative; overflow:hidden; display:flex; align-items:center; gap:12px; text-align:left;
+  padding:13px 14px; border-radius:13px; background:var(--bg-card); border:1px solid var(--line); cursor:pointer;
+  transition:transform .2s var(--ease-spring), border-color .2s var(--ease), background .2s var(--ease);
+}
+.dh-cat-card:hover{transform:translateX(2px); border-color:var(--line-strong); background:var(--bg-elevated);}
+.dh-cat-card:active{transform:translateX(0) scale(.985); transition-duration:.1s;}
+.dh-cat-icon{width:34px; height:34px; flex:0 0 auto; border-radius:10px; display:flex; align-items:center; justify-content:center; background:var(--steel-dim); color:var(--steel); font-size:15px;}
+.dh-cat-body{flex:1; min-width:0;}
+.dh-cat-title{font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.dh-cat-count{font-size:11px; color:var(--text-faint); margin-top:2px; font-family:var(--font-mono);}
+.dh-cat-arrow{color:var(--text-faint); flex:0 0 auto;}
+
+/* skeleton shimmer for async sections */
+.dh-skel{border-radius:13px; background:linear-gradient(100deg, var(--bg-card) 35%, var(--bg-elevated) 50%, var(--bg-card) 65%); background-size:200% 100%; animation:dhShimmer 1.4s ease-in-out infinite;}
+.dh-skel-cat{height:60px; margin-bottom:8px;}
+.dh-skel-doc{height:54px; margin-bottom:8px;}
+@keyframes dhShimmer{0%{background-position:200% 0;} 100%{background-position:-200% 0;}}
+
+/* --- Recent documents ------------------------------------------------------ */
+
+.dh-docs{display:flex; flex-direction:column; gap:8px;}
+.dh-doc-row{
+  display:flex; align-items:center; gap:11px; padding:12px 13px; border-radius:12px;
+  background:var(--bg-card); border:1px solid var(--line); cursor:pointer;
+  transition:border-color .2s var(--ease), background .2s var(--ease), transform .2s var(--ease-spring);
+}
+.dh-doc-row:hover{border-color:var(--line-strong); background:var(--bg-elevated); transform:translateY(-1px);}
+.dh-doc-badge{width:30px; height:30px; border-radius:9px; background:var(--ledger-dim); color:var(--ledger); display:flex; align-items:center; justify-content:center; flex:0 0 auto; font-size:13px;}
+.dh-doc-info{flex:1; min-width:0;}
+.dh-doc-title{font-size:12.5px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.dh-doc-meta{font-size:10.5px; color:var(--text-faint); margin-top:2px;}
+.dh-empty-inline{padding:20px 16px; text-align:center; border:1px dashed var(--line-strong); border-radius:13px; color:var(--text-faint); font-size:12px;}
+.dh-empty-inline button{margin-top:10px;}
+
+/* --- Features strip --------------------------------------------------------- */
+
+.dh-features{display:grid; grid-template-columns:1fr 1fr; gap:9px;}
+.dh-feature{display:flex; align-items:center; gap:9px; padding:11px 12px; border-radius:11px; background:var(--gradient-surface), var(--bg-card); border:1px solid var(--line); font-size:12px; color:var(--text-dim);}
+.dh-feature .icon{color:var(--ledger); flex:0 0 auto;}
+
+/* --- Stats row --------------------------------------------------------------- */
+
+.dh-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+.dh-stat{padding:14px 10px; text-align:center; border-radius:13px; background:var(--gradient-surface), var(--bg-card); border:1px solid var(--line);}
+.dh-stat-value{font-family:var(--font-mono); font-size:19px; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums;}
+.dh-stat-label{font-size:10px; color:var(--text-faint); margin-top:4px; letter-spacing:.2px;}
+
+@media (min-width:480px){
+  .dh-quick{grid-template-columns:1fr 1fr 1fr;}
+  .dh-features{grid-template-columns:1fr 1fr;}
+}
