@@ -30,19 +30,19 @@ async def _call(method_name: str, *args, **kwargs):
     if not providers:
         return None
 
-    last_err: SportProviderError | None = None
+    errors: list[str] = []
     for provider in providers:
         try:
             method = getattr(provider, method_name)
             return await method(*args, **kwargs)
         except SportProviderError as e:
-            last_err = e
+            errors.append(f"{provider.__name__.rsplit('.', 1)[-1]}: {e}")
             continue  # следующий источник в очереди
         except Exception as e:  # noqa: BLE001 — баг в разборе одного источника не должен ронять весь эндпоинт
-            last_err = SportProviderError(f"{provider.__name__}: непредвиденная ошибка ({type(e).__name__}: {e})", 502, rate_limited=True)
+            errors.append(f"{provider.__name__.rsplit('.', 1)[-1]}: непредвиденная ошибка ({type(e).__name__}: {e})")
             continue
 
-    raise last_err
+    raise SportProviderError("Все источники недоступны — " + "; ".join(errors), 502, rate_limited=True)
 
 
 async def popular_teams() -> list[dict]:
