@@ -103,6 +103,11 @@ class Settings:
     # сообщение вместо ошибки (см. sportApp.js).
     FOOTBALLDATA_API_KEY = os.getenv("FOOTBALLDATA_API_KEY", "")
     FOOTBALLDATA_BASE_URL = os.getenv("FOOTBALLDATA_BASE_URL", "https://footballdata.io/api/v1")
+    # Второй источник в цепочке (см. app/web/integrations/sport_provider.py) —
+    # подключается автоматически, когда footballdata.io исчерпает лимит или
+    # ответит ошибкой.
+    CLEARSPORTS_API_KEY = os.getenv("CLEARSPORTS_API_KEY", "")
+    CLEARSPORTS_BASE_URL = os.getenv("CLEARSPORTS_BASE_URL", "https://api.clearsportsapi.com/v1")
     SPORT_API_TIMEOUT = float(os.getenv("API_TIMEOUT", "10"))
     SPORT_API_RETRIES = int(os.getenv("API_RETRIES", "2"))
     SPORT_CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))

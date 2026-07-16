@@ -1,4 +1,6 @@
-"""AI Sport — REST-обёртка над footballdata.io для мини-аппа.
+"""AI Sport — REST-обёртка над очередью источников данных (см.
+app/web/integrations/sport_provider.py: footballdata.io -> clearsportsapi.com
+-> ...) для мини-аппа.
 
 Этот файл — тот самый app/web/api/sport_routes.py, на который ссылался
 комментарий в webapp/src/config/sportApi.js, но которого не было ни в одном
@@ -11,68 +13,69 @@
 """
 from fastapi import APIRouter, HTTPException, Query
 
-from app.web.integrations import footballdata as fd
+from app.web.integrations import sport_provider as sport
+from app.web.integrations.sport_common import SportProviderError
 
 router = APIRouter(prefix="/api/sport", tags=["sport"])
 
 
 @router.get("/status")
 async def status():
-    return {"configured": fd.is_configured()}
+    return {"configured": sport.is_configured()}
 
 
 @router.get("/teams/popular")
 async def teams_popular():
-    if not fd.is_configured():
+    if not sport.is_configured():
         # Честно пусто, а не ошибка — фронтенд покажет sa-hint-block вместо
         # красного экрана ошибки (см. sportApp.js: apiConfigured === false).
         return {"teams": []}
     try:
-        teams = await fd.popular_teams()
-    except fd.FootballDataError as e:
+        teams = await sport.popular_teams()
+    except SportProviderError as e:
         raise HTTPException(status_code=e.status, detail=str(e))
     return {"teams": teams}
 
 
 @router.get("/teams/search")
 async def teams_search(q: str = Query(..., min_length=2, max_length=80)):
-    if not fd.is_configured():
+    if not sport.is_configured():
         raise HTTPException(status_code=503, detail="AI Sport временно не подключён к источнику данных")
     try:
-        teams = await fd.search_teams(q)
-    except fd.FootballDataError as e:
+        teams = await sport.search_teams(q)
+    except SportProviderError as e:
         raise HTTPException(status_code=e.status, detail=str(e))
     return {"teams": teams}
 
 
 @router.get("/teams/{team_id}")
 async def team_detail(team_id: str):
-    if not fd.is_configured():
+    if not sport.is_configured():
         raise HTTPException(status_code=503, detail="AI Sport временно не подключён к источнику данных")
     try:
-        team = await fd.team_detail(team_id)
-    except fd.FootballDataError as e:
+        team = await sport.team_detail(team_id)
+    except SportProviderError as e:
         raise HTTPException(status_code=e.status, detail=str(e))
     return {"team": team}
 
 
 @router.get("/teams/{team_id}/matches")
 async def team_matches(team_id: str):
-    if not fd.is_configured():
+    if not sport.is_configured():
         raise HTTPException(status_code=503, detail="AI Sport временно не подключён к источнику данных")
     try:
-        matches = await fd.team_matches(team_id)
-    except fd.FootballDataError as e:
+        matches = await sport.team_matches(team_id)
+    except SportProviderError as e:
         raise HTTPException(status_code=e.status, detail=str(e))
     return matches
 
 
 @router.get("/live")
 async def live():
-    if not fd.is_configured():
+    if not sport.is_configured():
         return {"matches": [], "configured": False}
     try:
-        matches = await fd.live_matches()
-    except fd.FootballDataError as e:
+        matches = await sport.live_matches()
+    except SportProviderError as e:
         raise HTTPException(status_code=e.status, detail=str(e))
     return {"matches": matches, "configured": True}

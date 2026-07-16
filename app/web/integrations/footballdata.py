@@ -22,6 +22,7 @@ import time
 import httpx
 
 from app.web.config import settings
+from app.web.integrations.sport_common import SportProviderError, first as _first
 
 _cache: dict[str, tuple[float, dict]] = {}
 
@@ -40,19 +41,13 @@ def _cache_set(key: str, data: dict):
     _cache[key] = (time.monotonic(), data)
 
 
-class FootballDataError(Exception):
-    def __init__(self, message: str, status: int = 502):
-        super().__init__(message)
-        self.status = status
-
-
 def is_configured() -> bool:
     return bool(settings.FOOTBALLDATA_API_KEY)
 
 
 async def _get(path: str, params: dict | None = None, cache_key: str | None = None) -> dict:
     if not is_configured():
-        raise FootballDataError("FOOTBALLDATA_API_KEY не задан на сервере", 503)
+        raise SportProviderError("FOOTBALLDATA_API_KEY не задан на сервере", 503)
 
     if cache_key:
         cached = _cache_get(cache_key)
@@ -69,32 +64,25 @@ async def _get(path: str, params: dict | None = None, cache_key: str | None = No
                     f"{settings.FOOTBALLDATA_BASE_URL}{path}", headers=headers, params=params or {}
                 )
             if res.status_code in (401, 403):
-                raise FootballDataError("footballdata.io отклонил ключ (401/403) — проверьте FOOTBALLDATA_API_KEY", 502)
+                raise SportProviderError("footballdata.io отклонил ключ (401/403)", 502)
             if res.status_code == 429:
-                raise FootballDataError("footballdata.io: превышен лимит запросов, попробуйте позже", 502)
+                raise SportProviderError("footballdata.io: превышен лимит запросов", 429, rate_limited=True)
             res.raise_for_status()
             data = res.json()
             if cache_key:
                 _cache_set(cache_key, data)
             return data
-        except FootballDataError:
+        except SportProviderError:
             raise
         except httpx.HTTPStatusError as e:
-            raise FootballDataError(f"footballdata.io вернул ошибку {e.response.status_code}", 502)
+            raise SportProviderError(f"footballdata.io вернул ошибку {e.response.status_code}", 502, rate_limited=(e.response.status_code >= 500))
         except (httpx.TimeoutException, httpx.TransportError) as e:
             last_err = e
             if attempt < settings.SPORT_API_RETRIES and settings.SPORT_REQUEST_DELAY_MS:
                 await asyncio.sleep(settings.SPORT_REQUEST_DELAY_MS / 1000)
             continue
 
-    raise FootballDataError(f"Не удалось связаться с footballdata.io: {last_err}", 502)
-
-
-def _first(d: dict, *keys, default=None):
-    for k in keys:
-        if isinstance(d, dict) and d.get(k) not in (None, ""):
-            return d.get(k)
-    return default
+    raise SportProviderError(f"Не удалось связаться с footballdata.io: {last_err}", 502, rate_limited=True)
 
 
 def _map_venue(raw) -> dict:
@@ -169,7 +157,7 @@ async def popular_teams() -> list[dict]:
             continue
         try:
             td = await _get(f"/leagues/{lid}/teams", cache_key=f"league_teams:{lid}")
-        except FootballDataError:
+        except SportProviderError:
             continue
         raw_teams = td.get("data") or td.get("teams") or []
         teams.extend(_map_team(t) for t in raw_teams[:8] if isinstance(t, dict))
