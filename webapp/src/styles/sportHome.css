@@ -1,59 +1,43 @@
 /* sportHome.css — визуал главного экрана AI Sport (sportApp.js: renderHome()).
-   Тот же дизайн-язык, что и docsHome.css — токены из tokens.css, ничего не
-   выдумано в данных: карточки только оборачивают то, что реально приходит с
-   /api/sport/*. */
+   Тот же дизайн-язык, что и docsHome.css — токены из tokens.css. Реальные
+   данные (команды/live/тарифы) оборачивают то, что приходит с /api/sport/* и
+   /api/billing/plans; блоки "Топ матчи сегодня" и "Ваша статистика" — заявленное
+   демо-оформление референс-макета (см. комментарий у DEMO_TOP_MATCHES в
+   sportApp.js) и явно подписаны как демо на экране. */
 
-.sa-hero2 {
-  position: relative;
-  background: radial-gradient(ellipse 420px 220px at 85% -10%, var(--ledger-dim), transparent 70%), var(--bg-card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  padding: 22px 20px;
-  margin-bottom: 14px;
-  overflow: hidden;
-}
-.sa-hero2-badge {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px;
-  color: var(--ledger); background: var(--ledger-dim); border-radius: 20px; padding: 5px 11px; margin-bottom: 14px;
-}
-.sa-hero2-title {
-  font-family: var(--font-display); font-size: 24px; font-weight: 600; line-height: 1.2; margin-bottom: 10px;
-}
-.sa-hero2-sub { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin-bottom: 16px; max-width: 34ch; }
-
-.sa-action-row { display: flex; gap: 8px; margin-bottom: 14px; }
-.sa-action-btn {
-  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 11px 8px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong);
-  background: var(--bg-elevated); color: var(--text); font-size: 12px; font-weight: 500; cursor: pointer;
-}
-.sa-action-primary { background: var(--ledger); border-color: var(--ledger); color: var(--on-ledger); font-weight: 600; }
-
-.sa-tile-grid {
-  display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 18px;
-}
-.sa-tile {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius-sm);
-  padding: 12px 4px; color: var(--text-dim); font-size: 10px; cursor: pointer; text-align: center;
-}
-.sa-tile svg { color: var(--ledger); }
-.sa-tile span { color: var(--text); font-weight: 500; }
-.sa-tile em { font-style: normal; color: var(--text-faint); font-size: 9px; }
-.sa-tile-exit svg { color: var(--steel); }
-
-.sa-empty-mini {
-  font-size: 12px; color: var(--text-faint); padding: 14px; text-align: center;
-  background: var(--bg-card); border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); margin-bottom: 16px;
-}
-
-/* ---------- каркас модуля (шапка, состояния загрузки/ошибки) ---------- */
+/* ---------- шапка модуля (бренд-хедер на home / простая back-панель на подэкранах) ---------- */
 
 .sport-app { padding-bottom: 12px; }
+
 .sa-topbar { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 14px; }
 .sa-brand { display: flex; align-items: center; gap: 7px; font-family: var(--font-display); font-size: 15px; font-weight: 600; }
 .sa-brand svg { color: var(--ledger); }
+
+.sa-header { display: flex; align-items: center; justify-content: space-between; padding: 2px 0 16px; gap: 10px; }
+.sa-header-left { display: flex; align-items: center; gap: 10px; background: none; border: none; cursor: pointer; padding: 0; text-align: left; }
+.sa-avatar {
+  width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--gradient-ledger); color: var(--on-ledger);
+  font-family: var(--font-display); font-weight: 700; font-size: 13px;
+  box-shadow: var(--glow-ledger);
+}
+.sa-header-titles { display: flex; flex-direction: column; line-height: 1.25; }
+.sa-header-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--text); }
+.sa-header-sub { font-size: 11px; color: var(--ledger); }
+.sa-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sa-pro-pill {
+  display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600;
+  color: var(--ledger); background: var(--ledger-dim); border: 1px solid rgba(0,217,160,0.3);
+  border-radius: 20px; padding: 7px 12px; cursor: pointer;
+}
+.sa-pro-pill svg { color: var(--ledger); }
+.sa-bell-btn {
+  position: relative; width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-card); border: 1px solid var(--line-strong); color: var(--text); cursor: pointer;
+}
+.sa-bell-dot { position: absolute; top: 7px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--violet); box-shadow: 0 0 0 2px var(--bg-card); }
 
 .sa-loading, .sa-error { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 16px; text-align: center; color: var(--text-dim); font-size: 13px; }
 .sa-spinner { width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid var(--line-strong); border-top-color: var(--ledger); animation: sa-spin 0.8s linear infinite; }
@@ -63,21 +47,110 @@
 .sa-btn-secondary { padding: 9px 16px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong); background: var(--bg-elevated); color: var(--text); font-size: 12.5px; cursor: pointer; }
 .sa-empty { padding: 30px 16px; text-align: center; color: var(--text-faint); font-size: 12.5px; }
 .sa-hint-block { font-size: 11.5px; color: var(--text-faint); background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 14px; line-height: 1.5; }
+.sa-demo-caption { font-size: 10.5px; color: var(--text-faint); text-align: center; margin: -4px 0 18px; line-height: 1.5; }
 
-/* ---------- поиск ---------- */
+/* ---------- hero-карточка (референс: заголовок, бейджи точности/ROI, поиск, действия) ---------- */
 
-.sa-search-row { display: flex; gap: 8px; }
+.sa-hero {
+  position: relative;
+  background:
+    radial-gradient(ellipse 260px 200px at 88% -6%, rgba(143,123,255,0.24), transparent 68%),
+    radial-gradient(ellipse 300px 220px at 8% 108%, rgba(0,217,160,0.14), transparent 65%),
+    var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 20px 18px 18px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.sa-hero-badges { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: -6px; }
+.sa-hero-stat {
+  display: flex; flex-direction: column; gap: 2px; background: var(--bg-elevated);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 7px 11px;
+  font-size: 9.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.3px;
+}
+.sa-hero-stat strong { display: flex; align-items: center; gap: 3px; font-family: var(--font-mono); font-size: 13.5px; color: var(--ledger); text-transform: none; letter-spacing: 0; }
+.sa-hero-stat-roi strong { color: var(--violet); }
+.sa-hero-stat-up { transform: rotate(-45deg); width: 0.8em; height: 0.8em; }
+
+.sa-hero-ball { color: var(--ledger); opacity: 0.16; position: absolute; right: -18px; top: 34px; width: 130px; height: 130px; }
+.sa-hero-ball svg { width: 100%; height: 100%; }
+
+.sa-hero-title { font-family: var(--font-display); font-size: 23px; font-weight: 600; line-height: 1.22; margin: 10px 0 8px; max-width: 20ch; }
+.sa-hero-title em { font-style: normal; color: var(--ledger); }
+.sa-hero-sub { font-size: 12.5px; color: var(--text-dim); line-height: 1.55; margin-bottom: 14px; max-width: 32ch; }
+
+.sa-hero-profit {
+  display: inline-flex; align-items: center; gap: 8px; background: var(--bg-elevated);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 7px 12px; margin-bottom: 16px;
+  font-size: 11px; color: var(--text-faint);
+}
+.sa-hero-profit span { display: flex; align-items: center; gap: 5px; }
+.sa-hero-profit strong { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
+
+.sa-search-row { display: flex; gap: 8px; margin-bottom: 12px; }
 .sa-search-input { flex: 1; }
 .sa-search-btn { padding: 0 18px; border-radius: var(--radius-sm); border: none; background: var(--ledger); color: var(--on-ledger); font-weight: 600; font-size: 13px; cursor: pointer; }
 
+.sa-action-row { display: flex; gap: 8px; }
+.sa-action-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 11px 6px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong);
+  background: var(--bg-elevated); color: var(--text); font-size: 12px; font-weight: 500; cursor: pointer;
+}
+.sa-action-primary { background: var(--gradient-ledger); border-color: transparent; color: var(--on-ledger); font-weight: 600; box-shadow: var(--glow-ledger); }
+
+/* ---------- быстрая навигация: 5 круглых иконок ---------- */
+
+.sa-tile-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 16px 0 18px; }
+.sa-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 12px 3px 10px; color: var(--text-dim); font-size: 9.5px; cursor: pointer; text-align: center;
+}
+.sa-tile svg {
+  width: 34px; height: 34px; padding: 8px; box-sizing: border-box; border-radius: 50%;
+  background: var(--ledger-dim); color: var(--ledger);
+}
+.sa-tile span { color: var(--text); font-weight: 500; font-size: 10px; }
+.sa-tile em { font-style: normal; color: var(--text-faint); font-size: 8.5px; }
+.sa-tile-exit svg { background: var(--steel-dim); color: var(--steel); }
+.sa-tile:nth-child(3) svg { background: var(--violet-dim); color: var(--violet); }
+.sa-tile:nth-child(4) svg { background: var(--amber-dim); color: var(--amber); }
+
+.sa-empty-mini {
+  font-size: 12px; color: var(--text-faint); padding: 14px; text-align: center;
+  background: var(--bg-card); border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); margin-bottom: 16px;
+}
+
+/* ---------- заголовки секций / ссылки ---------- */
+
 .sa-h2, .sa-section-head h2 { font-family: var(--font-display); font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
-.sa-section-head { margin: 18px 0 10px; }
+.sa-section-head { margin: 18px 0 10px; display: flex; align-items: center; justify-content: space-between; }
+.sa-flame { color: var(--amber); }
+.sa-link-btn { display: flex; align-items: center; gap: 4px; background: none; border: none; color: var(--violet); font-size: 11.5px; font-weight: 600; cursor: pointer; padding: 0; }
 .sa-live-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .sa-btn-ghost { display: flex; align-items: center; gap: 5px; background: none; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 6px 12px; font-size: 11.5px; color: var(--text-dim); cursor: pointer; }
+
+/* ---------- тарифы (реальные данные /api/billing/plans) ---------- */
+
+.sa-plan-row { display: flex; gap: 8px; margin-bottom: 6px; }
+.sa-plan-card {
+  flex: 1; display: flex; flex-direction: column; gap: 6px; text-align: left;
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius-md);
+  padding: 14px 12px; cursor: pointer; min-width: 0;
+}
+.sa-plan-title { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+.sa-plan-price { font-family: var(--font-mono); font-size: 17px; font-weight: 600; color: var(--text); display: flex; flex-direction: column; gap: 2px; }
+.sa-plan-price em { font-style: normal; font-size: 9.5px; font-weight: 500; color: var(--text-faint); display: flex; align-items: center; gap: 3px; }
+.sa-plan-featured { border-color: var(--ledger); box-shadow: var(--glow-ledger); }
+.sa-plan-featured .sa-plan-title { color: var(--ledger); }
+.sa-plan-badge { display: flex; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 600; color: var(--ledger); }
 
 /* ---------- герб команды / плейсхолдер ---------- */
 
 .sa-crest-wrap { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; background: var(--bg-elevated); flex-shrink: 0; }
+.sa-crest-sm { width: 22px; height: 22px; font-size: 8.5px; }
 .sa-crest-md { width: 30px; height: 30px; }
 .sa-crest-lg { width: 44px; height: 44px; }
 .sa-crest-xl { width: 68px; height: 68px; }
@@ -92,7 +165,7 @@
 .sa-team-card-name { font-size: 11px; font-weight: 500; color: var(--text); text-align: center; line-height: 1.3; }
 .sa-team-card-country { font-size: 9.5px; color: var(--text-faint); }
 
-/* ---------- список матчей ---------- */
+/* ---------- список матчей (реальные, api-football) ---------- */
 
 .sa-fixture-list { display: flex; flex-direction: column; gap: 8px; }
 .sa-fixture { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 10px 12px; }
@@ -112,6 +185,42 @@
 .sa-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff5a40; display: inline-block; animation: sa-pulse 1.4s ease-in-out infinite; }
 @keyframes sa-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
+/* ---------- "Топ матчи сегодня" — демо-карточки с прогнозом ---------- */
+
+.sa-pred-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.sa-pred-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px; }
+.sa-pred-league { font-size: 9.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; }
+.sa-pred-main { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; }
+.sa-pred-teams { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.sa-pred-team { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; color: var(--text); }
+.sa-pred-team span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sa-pred-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 92px; }
+.sa-pred-pick-label { font-size: 10px; color: var(--ledger); font-weight: 600; }
+.sa-pred-confidence { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--text); display: flex; flex-direction: column; }
+.sa-pred-confidence em { font-style: normal; font-size: 8.5px; font-weight: 500; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.3px; }
+.sa-pred-bar { display: block; width: 78px; height: 3px; border-radius: 2px; background: var(--line-strong); overflow: hidden; margin-top: 2px; }
+.sa-pred-bar span { display: block; height: 100%; background: var(--gradient-ledger); border-radius: 2px; }
+.sa-pred-odds { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.sa-pred-odds span { font-family: var(--font-mono); font-size: 16px; font-weight: 700; color: var(--text); }
+.sa-pred-odds em { font-style: normal; font-size: 8.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.3px; }
+.sa-pred-fav { grid-row: 1 / 3; background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 2px; align-self: start; }
+.sa-pred-fav:hover { color: var(--amber); }
+
+/* ---------- "Ваша статистика" — демо-карточки со спарклайнами ---------- */
+
+.sa-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 6px; }
+.sa-stat-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px; }
+.sa-stat-value { font-family: var(--font-mono); font-size: 19px; font-weight: 700; margin-bottom: 2px; }
+.sa-stat-ledger { color: var(--ledger); }
+.sa-stat-violet { color: var(--violet); }
+.sa-stat-steel { color: var(--steel); }
+.sa-stat-label { font-size: 11.5px; color: var(--text); font-weight: 500; }
+.sa-stat-sub { font-size: 9.5px; color: var(--text-faint); margin-bottom: 8px; }
+.sa-spark { width: 100%; height: 26px; display: block; }
+.sa-spark-ledger { color: var(--ledger); }
+.sa-spark-violet { color: var(--violet); }
+.sa-spark-steel { color: var(--steel); }
+
 /* ---------- карточка команды ---------- */
 
 .sa-team-hero { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 0 16px; text-align: center; }
@@ -128,3 +237,11 @@
 .sa-form-D { background: var(--bg-elevated); color: var(--text-faint); }
 .sa-form-L { background: rgba(255,90,64,0.14); color: var(--danger-text); }
 .sa-form-summary { font-size: 11px; color: var(--text-faint); }
+
+/* ---------- адаптация под очень узкий экран ---------- */
+
+@media (max-width: 360px) {
+  .sa-hero-title { font-size: 20px; }
+  .sa-pred-pick { min-width: 76px; }
+  .sa-pred-bar { width: 62px; }
+}

@@ -1,57 +1,76 @@
-// Личный кабинет. Полноэкранный раздел в том же паттерне, что и docsApp.js /
-// sportApp.js (см. navigation.js) — открывается поверх остальных вкладок,
-// "назад" возвращает туда, откуда пришли.
+// Личный кабинет — теперь "CodeNexa HUB": центральный экран всей экосистемы,
+// а не просто настройки одного бота (см. ТЗ на редизайн профиля). Открывается
+// в том же паттерне, что и docsApp.js/sportApp.js (см. navigation.js) —
+// поверх остальных вкладок, "назад" возвращает туда, откуда пришли. Контракт
+// с main.js не менялся: openAccountApp(logoutCallback) / closeAccountApp().
+//
+// Модульность: каждый блок HUB'а — отдельный файл в components/profile/*.js,
+// который просто получает нужные ему данные и коллбэки. Чтобы добавить новый
+// блок в будущем, не нужно трогать остальные — только зарегистрировать его
+// здесь, в render()/bind().
 import { authApi, setToken } from '../api/authApi.js';
 import { haptic, openInvoice, showAlert } from '../telegram.js';
 import { captureReturnTarget, getReturnTarget, reopenProductIfNeeded } from '../navigation.js';
-import { esc } from '../utils/html.js';
-import { icon } from '../utils/icons.js';
 import { errorHTML as _errorHTML, loadingHTML as _loadingHTML } from '../utils/loadingState.js';
+import { t, toggleLang } from '../i18n.js';
+import { icon } from '../utils/icons.js';
+import { openLegalView } from './legal.js';
+
+import { hubHeaderHTML } from './profile/hubHeader.js';
+import { ecosystemGridHTML, bindEcosystemGrid } from './profile/ecosystemGrid.js';
+import { subscriptionCardHTML, bindSubscriptionCard } from './profile/subscriptionCard.js';
+import { activitySummaryHTML } from './profile/activitySummary.js';
+import { aiInsightsHTML, bindAiInsights } from './profile/aiInsights.js';
+import { achievementsHTML } from './profile/achievements.js';
+import { paymentsSectionHTML } from './profile/paymentsSection.js';
+import { referralSectionHTML, bindReferralSection } from './profile/referralSection.js';
+import { securitySectionHTML, bindSecuritySection } from './profile/securitySection.js';
+import { settingsSectionHTML, bindSettingsSection } from './profile/settingsSection.js';
+import { supportSectionHTML, bindSupportSection } from './profile/supportSection.js';
+import { ecosystemBannerHTML } from './profile/ecosystemBanner.js';
+import { openProductView } from './productDetail.js';
 
 let root = null;
 let user = null;
 let onLoggedOut = null;
+let hubViewOpen = false;
 
 // checkout-ключ ("checkout:<plan>:<method>") -> Idempotency-Key одной попытки
 // оплаты. См. обработчик [data-acc-buy] ниже и аудит, п.0.5.
 const checkoutIdempotencyKeys = new Map();
 
-// Локальное состояние экрана — форма пароля, поток включения 2FA, тарифы, платежи
-let state = {
-  loading: true,
-  error: null,
-  sessions: null,
-  plans: null,
-  billing: null,
-  totpFlow: null, // { secret, otpauthUrl } во время включения 2FA, пока не подтверждено кодом
-  busy: {}, // busy['password'] / busy['2fa'] / busy['checkout:pro_monthly:stars'] и т.д.
-  notices: {}, // короткие сообщения об успехе/ошибке рядом с конкретным блоком
-};
-
-
-function initials(u) {
-  const n = (u.firstName || u.email || 'U').trim();
-  return n.slice(0, 1).toUpperCase();
+function freshState() {
+  return {
+    loading: true,
+    error: null,
+    sessions: null,
+    plans: null,
+    billing: null,
+    referral: null, // { referralCode, confirmedCount, pendingCount } — см. api/authApi.js referralStats()
+    totpFlow: null, // { secret, otpauthUrl } во время включения 2FA, пока не подтверждено кодом
+    busy: {}, // busy['password'] / busy['2fa'] / busy['checkout:pro_monthly:stars'] и т.д.
+    notices: {}, // короткие сообщения об успехе/ошибке рядом с конкретным блоком
+  };
 }
 
-function methodBadge(active, label) {
-  return `<span class="acc-badge ${active ? 'on' : 'off'}">${active ? icon('check') : '—'} ${esc(label)}</span>`;
-}
+let state = freshState();
 
 async function loadAll() {
   state.loading = true;
   render();
   try {
-    const [meRes, sessionsRes, plansRes, billingRes] = await Promise.all([
+    const [meRes, sessionsRes, plansRes, billingRes, referralRes] = await Promise.all([
       authApi.me(),
       authApi.sessions().catch(() => ({ sessions: [] })),
       authApi.plans().catch(() => ({ plans: [], cryptoAssets: [] })),
-      authApi.billingStatus().catch(() => ({ payments: [] })),
+      authApi.billingStatus().catch(() => ({ payments: [], hasPaid: false })),
+      authApi.referralStats().catch(() => null),
     ]);
     user = meRes.user;
     state.sessions = sessionsRes.sessions;
     state.plans = plansRes;
     state.billing = billingRes;
+    state.referral = referralRes;
     state.error = null;
   } catch (e) {
     state.error = e.message || 'Не удалось загрузить аккаунт';
@@ -60,180 +79,85 @@ async function loadAll() {
   render();
 }
 
-function fmtDate(iso) {
-  if (!iso) return '—';
-  try {
-    return new Date(iso.replace(' ', 'T') + 'Z').toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function headerHTML() {
-  return `
-  <div class="acc-header">
-    <div class="acc-avatar">${initials(user)}</div>
-    <div class="acc-id">
-      <div class="acc-name">${esc(user.firstName || 'Без имени')} ${esc(user.lastName || '')}</div>
-      <div class="acc-email">${esc(user.email || 'Email не привязан')}</div>
-    </div>
-  </div>
-  <div class="acc-badges">
-    ${methodBadge(user.hasTelegram, 'Telegram')}
-    ${methodBadge(user.hasGoogle, 'Google')}
-    ${methodBadge(user.hasYandex, 'Яндекс')}
-    ${methodBadge(user.hasPassword, 'Пароль')}
-  </div>`;
-}
-
-function securityHTML() {
-  const notice = state.notices.security
-    ? `<div class="acc-notice ${state.notices.security.ok ? 'ok' : 'err'}">${esc(state.notices.security.text)}</div>`
-    : '';
-
-  const passwordForm = `
-    <form class="acc-form" data-acc-password-form>
-      ${
-        user.hasPassword
-          ? `
-      <label class="acc-field"><span>Текущий пароль</span><input type="password" name="currentPassword" autocomplete="current-password" /></label>`
-          : ''
-      }
-      <label class="acc-field"><span>Новый пароль</span><input type="password" name="newPassword" minlength="8" required autocomplete="new-password" /></label>
-      <button class="acc-btn acc-btn-small" ${state.busy.password ? 'disabled' : ''}>${user.hasPassword ? 'Сменить пароль' : 'Задать пароль'}</button>
-    </form>`;
-
-  let totpBlock;
-  if (user.twoFaEnabled) {
-    totpBlock = `
-    <p class="acc-muted">Двухфакторная аутентификация включена.</p>
-    <form class="acc-form" data-acc-2fa-disable-form>
-      <label class="acc-field"><span>Код для отключения</span><input type="text" name="code" inputmode="numeric" placeholder="123456" required /></label>
-      <button class="acc-btn acc-btn-small acc-btn-danger" ${state.busy.twofa ? 'disabled' : ''}>Отключить 2FA</button>
-    </form>`;
-  } else if (state.totpFlow) {
-    totpBlock = `
-    <p class="acc-muted">Отсканируйте QR в приложении-аутентификаторе (Google Authenticator, Authy) или введите ключ вручную:</p>
-    <div class="acc-totp-secret">${esc(state.totpFlow.secret)}</div>
-    <form class="acc-form" data-acc-2fa-confirm-form>
-      <label class="acc-field"><span>Код из приложения</span><input type="text" name="code" inputmode="numeric" placeholder="123456" required /></label>
-      <button class="acc-btn acc-btn-small" ${state.busy.twofa ? 'disabled' : ''}>Подтвердить и включить</button>
-    </form>`;
-  } else {
-    totpBlock = `
-    <p class="acc-muted">Дополнительный код при входе — защищает аккаунт, даже если пароль узнают.</p>
-    <button class="acc-btn acc-btn-small" data-acc-2fa-start ${state.busy.twofa ? 'disabled' : ''}>Включить 2FA</button>`;
-  }
-
-  const sessionsList =
-    (state.sessions || [])
-      .map(
-        (s) => `
-    <div class="acc-session ${s.revoked ? 'revoked' : ''}">
-      <div>
-        <div class="acc-session-ua">${esc(s.user_agent || 'Неизвестное устройство').slice(0, 48)}</div>
-        <div class="acc-session-meta">${esc(s.ip || '')} · ${fmtDate(s.created_at)}${s.revoked ? ' · отозвана' : ''}</div>
-      </div>
-      ${!s.revoked ? `<button class="acc-link-btn" data-acc-revoke-session="${s.id}">Выйти</button>` : ''}
-    </div>`
-      )
-      .join('') ||
-    '<p class="acc-muted">Нет активных сессий email/OAuth (вход через Telegram не создаёт отдельную сессию).</p>';
-
-  return `
-  <div class="acc-section">
-    <div class="acc-section-title">Безопасность</div>
-    ${notice}
-    <div class="acc-subblock">
-      <div class="acc-subtitle">${user.hasPassword ? 'Пароль' : 'Задать пароль для входа по email'}</div>
-      ${passwordForm}
-    </div>
-    <div class="acc-subblock">
-      <div class="acc-subtitle">Двухфакторная аутентификация (2FA)</div>
-      ${totpBlock}
-    </div>
-    <div class="acc-subblock">
-      <div class="acc-subtitle">Активные сессии</div>
-      ${sessionsList}
-      ${(state.sessions || []).some((s) => !s.revoked) ? `<button class="acc-link-btn acc-link-danger" data-acc-revoke-all>Выйти на всех устройствах</button>` : ''}
-    </div>
-  </div>`;
-}
-
-function billingHTML() {
-  const plans = (state.plans && state.plans.plans) || [];
-  const payments = (state.billing && state.billing.payments) || [];
-
-  const planCards = plans
-    .map(
-      (p) => `
-    <div class="acc-plan">
-      <div class="acc-plan-title">${esc(p.title)}</div>
-      <div class="acc-plan-price">$${esc(p.usd)} <span>или ${esc(String(p.stars))} ${icon('star')}</span></div>
-      <div class="acc-plan-actions">
-        <button class="acc-btn acc-btn-small" data-acc-buy="${p.code}" data-method="stars" ${state.busy['checkout:' + p.code + ':stars'] ? 'disabled' : ''}>Оплатить Stars</button>
-        <button class="acc-btn acc-btn-small acc-btn-ghost" data-acc-buy="${p.code}" data-method="cryptobot" ${state.busy['checkout:' + p.code + ':cryptobot'] ? 'disabled' : ''}>Оплатить крипто</button>
-      </div>
-    </div>`
-    )
-    .join('');
-
-  const paymentRows =
-    payments
-      .map(
-        (p) => `
-    <div class="acc-payment">
-      <span>${esc(p.plan || '—')}</span>
-      <span class="acc-payment-provider">${esc(p.provider)}</span>
-      <span class="acc-payment-status status-${esc(p.status)}">${esc(p.status)}</span>
-      <span class="acc-payment-date">${fmtDate(p.created_at)}</span>
-    </div>`
-      )
-      .join('') || '<p class="acc-muted">Платежей пока нет.</p>';
-
-  return `
-  <div class="acc-section">
-    <div class="acc-section-title">Тарифы и оплата</div>
-    <div class="acc-plans">${planCards}</div>
-    <div class="acc-subblock">
-      <div class="acc-subtitle">История платежей</div>
-      ${paymentRows}
-    </div>
-  </div>`;
+function sectionHead(iconName, titleKey) {
+  return `<div class="hub-section-head"><div class="hub-section-title">${icon(iconName)} ${t(titleKey)}</div></div>`;
 }
 
 function render() {
   if (!root) return;
 
   if (state.loading) {
-    // Раунд 8 (см. CHANGES_ROUND8.md, модуль 7): раньше здесь был голый
-    // текст без спиннера — единственный полноэкранный модуль без него
-    // (docsApp.js/sportApp.js уже показывали da-spinner/sa-spinner).
-    root.innerHTML = `<div class="acc-wrap">${_loadingHTML('acc', 'Загрузка аккаунта…')}</div>`;
+    root.innerHTML = `<div class="hub-wrap">${_loadingHTML('acc', 'Загрузка аккаунта…')}</div>`;
     return;
   }
   if (state.error || !user) {
-    // Раунд 8: раньше ошибка была тупиком — не было кнопки повтора,
-    // пользователь мог только закрыть раздел и открыть заново. Теперь —
-    // тот же паттерн `data-retry`, что и в docsApp.js/sportApp.js.
-    root.innerHTML = `<div class="acc-wrap">${_errorHTML('acc', state.error || 'Аккаунт не найден')}</div>`;
+    root.innerHTML = `<div class="hub-wrap">${_errorHTML('acc', state.error || 'Аккаунт не найден')}</div>`;
     const retryBtn = root.querySelector('[data-retry]');
     if (retryBtn) retryBtn.addEventListener('click', loadAll);
     return;
   }
 
   root.innerHTML = `
-  <div class="acc-wrap">
-    <button class="acc-back" data-acc-back>← Назад</button>
-    ${headerHTML()}
-    ${securityHTML()}
-    ${billingHTML()}
-    <button class="acc-btn acc-btn-logout" data-acc-logout>Выйти из аккаунта</button>
+  <div class="hub-wrap">
+    <button class="pd-back" data-acc-back>${t('acc_back_btn')}</button>
+
+    ${hubHeaderHTML(user, !!(state.billing && state.billing.hasPaid))}
+
+    <div class="hub-section" id="hub-ecosystem">
+      ${sectionHead('layers', 'hub_section_ecosystem')}
+      ${ecosystemGridHTML()}
+    </div>
+
+    <div class="hub-section" id="hub-ai">
+      ${sectionHead('sparkles', 'hub_section_ai')}
+      ${aiInsightsHTML()}
+    </div>
+
+    <div class="hub-section" id="hub-subscription">
+      ${sectionHead('crown', 'hub_section_subscription')}
+      ${subscriptionCardHTML(state.billing, state.plans)}
+    </div>
+
+    <div class="hub-section" id="hub-activity">
+      ${sectionHead('pieChart', 'hub_section_activity')}
+      ${activitySummaryHTML(user, state.sessions, state.billing)}
+    </div>
+
+    <div class="hub-section" id="hub-achievements">
+      ${sectionHead('trophy', 'hub_section_achievements')}
+      ${achievementsHTML(user, state.billing)}
+    </div>
+
+    <div class="hub-section" id="hub-payments">
+      ${sectionHead('creditCard', 'hub_section_payments')}
+      ${paymentsSectionHTML(state)}
+    </div>
+
+    <div class="hub-section" id="hub-referral">
+      ${sectionHead('users', 'hub_section_referral')}
+      ${referralSectionHTML(state.referral)}
+    </div>
+
+    <div class="hub-section" id="hub-security">
+      ${sectionHead('shieldCheck', 'hub_section_security')}
+      ${securitySectionHTML(user, state)}
+    </div>
+
+    <div class="hub-section" id="hub-settings">
+      ${sectionHead('tool', 'hub_section_settings')}
+      ${settingsSectionHTML()}
+    </div>
+
+    <div class="hub-section" id="hub-support">
+      ${sectionHead('bot', 'hub_section_support')}
+      ${supportSectionHTML()}
+    </div>
+
+    <div class="hub-section">
+      ${ecosystemBannerHTML()}
+    </div>
+
+    <button class="acc-btn acc-btn-logout" data-acc-logout>${t('acc_logout_btn')}</button>
   </div>`;
 
   bind();
@@ -242,91 +166,32 @@ function render() {
 function bind() {
   root.querySelector('[data-acc-back]').addEventListener('click', closeAccountApp);
 
-  const passForm = root.querySelector('[data-acc-password-form]');
-  if (passForm)
-    passForm.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const fd = new FormData(ev.target);
-      state.busy.password = true;
-      render();
-      try {
-        await authApi.changePassword(fd.get('currentPassword') || undefined, fd.get('newPassword'));
-        state.notices.security = { ok: true, text: 'Пароль обновлён.' };
-        haptic('medium');
-        await loadAll();
-      } catch (e) {
-        state.notices.security = { ok: false, text: e.message };
-      }
-      state.busy.password = false;
-      render();
+  const editBtn = root.querySelector('[data-hub-edit-profile]');
+  if (editBtn)
+    editBtn.addEventListener('click', () => {
+      document.getElementById('hub-security')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
-  const start2fa = root.querySelector('[data-acc-2fa-start]');
-  if (start2fa)
-    start2fa.addEventListener('click', async () => {
-      state.busy.twofa = true;
+  bindEcosystemGrid(root, render);
+  bindAiInsights(root, (productId) => openProductView(productId));
+  bindSubscriptionCard(root, 'hub-payments');
+  bindReferralSection(root);
+  bindSecuritySection(root, { state, render, loadAll });
+  bindSettingsSection(root, {
+    onLangToggle: () => {
+      const lang = toggleLang();
+      // Синхронизируем глобальную кнопку языка в шапке приложения, даже пока
+      // открыт полноэкранный HUB — иначе она бы отставала до следующего клика.
+      const globalToggle = document.getElementById('lang-toggle');
+      if (globalToggle) globalToggle.textContent = lang.toUpperCase();
       render();
-      try {
-        state.totpFlow = await authApi.setup2FA();
-      } catch (e) {
-        state.notices.security = { ok: false, text: e.message };
-      }
-      state.busy.twofa = false;
-      render();
-    });
-
-  const confirm2fa = root.querySelector('[data-acc-2fa-confirm-form]');
-  if (confirm2fa)
-    confirm2fa.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const code = new FormData(ev.target).get('code');
-      state.busy.twofa = true;
-      render();
-      try {
-        await authApi.confirm2FA(code);
-        state.totpFlow = null;
-        state.notices.security = { ok: true, text: '2FA включена.' };
-        haptic('medium');
-        await loadAll();
-      } catch (e) {
-        state.notices.security = { ok: false, text: e.message };
-      }
-      state.busy.twofa = false;
-      render();
-    });
-
-  const disable2fa = root.querySelector('[data-acc-2fa-disable-form]');
-  if (disable2fa)
-    disable2fa.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const code = new FormData(ev.target).get('code');
-      state.busy.twofa = true;
-      render();
-      try {
-        await authApi.disable2FA(code);
-        state.notices.security = { ok: true, text: '2FA отключена.' };
-        await loadAll();
-      } catch (e) {
-        state.notices.security = { ok: false, text: e.message };
-      }
-      state.busy.twofa = false;
-      render();
-    });
-
-  root.querySelectorAll('[data-acc-revoke-session]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      await authApi.revokeSession(Number(btn.dataset.accRevokeSession));
-      await loadAll();
-    });
+    },
   });
+  bindSupportSection(root, { onOpenLegal: () => openLegalView() });
 
-  const revokeAll = root.querySelector('[data-acc-revoke-all]');
-  if (revokeAll)
-    revokeAll.addEventListener('click', async () => {
-      await authApi.revokeAllSessions();
-      await loadAll();
-    });
-
+  // Платежи: переиспользуем ровно ту же логику чекаута/idempotency, что была
+  // в исходном accountApp.js — блок paymentsSection.js рендерит те же
+  // data-acc-buy кнопки.
   root.querySelectorAll('[data-acc-buy]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const plan = btn.dataset.accBuy;
@@ -334,11 +199,6 @@ function bind() {
       const key = `checkout:${plan}:${method}`;
       state.busy[key] = true;
       render();
-      // Один и тот же idempotency-ключ на всю попытку оплаты: если запрос
-      // упал (сеть/таймаут) и пользователь нажмёт ещё раз — бэкенд опознает
-      // повтор и не создаст второй платёж/инвойс (см. аудит, п.0.5).
-      // После успеха или явной отмены ключ сбрасывается — следующая покупка
-      // получит новый.
       if (!checkoutIdempotencyKeys.has(key)) {
         checkoutIdempotencyKeys.set(key, crypto.randomUUID());
       }
@@ -379,24 +239,26 @@ function bind() {
 export function openAccountApp(logoutCallback) {
   onLoggedOut = logoutCallback;
   captureReturnTarget();
-  document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach((tabEl) => tabEl.classList.remove('active'));
   document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
   document.getElementById('view-account').classList.add('active');
   root = document.getElementById('view-account');
-  state = {
-    loading: true,
-    error: null,
-    sessions: null,
-    plans: null,
-    billing: null,
-    totpFlow: null,
-    busy: {},
-    notices: {},
-  };
+  hubViewOpen = true;
+  state = freshState();
   loadAll();
 }
 
+// Пере-рендер HUB'а на месте после смены языка через глобальный переключатель
+// в шапке (main.js) — тот же паттерн, что rerenderOpenProductView/
+// rerenderOpenLegalView в productDetail.js/legal.js.
+export function rerenderOpenAccountApp() {
+  if (!hubViewOpen || !root) return;
+  if (!root.classList.contains('active')) return;
+  render();
+}
+
 export function closeAccountApp() {
+  hubViewOpen = false;
   document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
   const target = getReturnTarget();
   if (reopenProductIfNeeded(target)) return;

@@ -27,7 +27,7 @@ import { renderTrust } from './components/trust.js';
 import { renderInvestors } from './components/investors.js';
 
 import { openProductView, rerenderOpenProductView } from './components/productDetail.js';
-import { openAccountApp } from './components/accountApp.js';
+import { openAccountApp, rerenderOpenAccountApp } from './components/accountApp.js';
 import { openLegalView, rerenderOpenLegalView } from './components/legal.js';
 
 initMonitoring();
@@ -97,6 +97,7 @@ function wireChrome() {
       renderDashboardSections();
       rerenderOpenProductView();
       rerenderOpenLegalView();
+      rerenderOpenAccountApp();
     });
   }
 }

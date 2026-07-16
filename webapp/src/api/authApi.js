@@ -108,6 +108,10 @@ export const authApi = {
 
   plans: () => request('/api/billing/plans'),
   billingStatus: () => request('/api/billing/status'),
+  // Реальная реферальная статистика с бэкенда (app/web/api/referrals.py) —
+  // confirmedCount подтверждается только первой оплатой приглашённого
+  // (см. referrals.py), поэтому это честное число, а не локальный счётчик.
+  referralStats: () => request('/api/referrals/me'),
   // idempotencyKey: см. components/accountApp.js — один и тот же ключ на всю
   // попытку оплаты (переживает ретраи после ошибки), чтобы повторная отправка
   // не создавала второй инвойс на бэкенде (см. аудит, п.0.5).

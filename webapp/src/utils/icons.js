@@ -52,6 +52,14 @@ const PATHS = {
   search: '<circle cx="10.8" cy="10.8" r="6.3"/><line x1="15.5" y1="15.5" x2="20.5" y2="20.5"/>',
   trophy: '<path d="M7 4.5h10v5a5 5 0 0 1-10 0z"/><path d="M7 5.5H4a3 3 0 0 0 3 4.3M17 5.5h3a3 3 0 0 1-3 4.3"/><path d="M12 14.5v3.2M9 20.5h6M9.8 17.7h4.4l.4 2.8H9.4z"/>',
   calendar: '<rect x="3.5" y="5.2" width="17" height="15.3" rx="1.6"/><line x1="3.5" y1="9.8" x2="20.5" y2="9.8"/><line x1="8" y1="3" x2="8" y2="7.2"/><line x1="16" y1="3" x2="16" y2="7.2"/>',
+
+  // AI Sport home redesign
+  bell: '<path d="M6 9.5a6 6 0 0 1 12 0c0 4 1.4 5.6 2 6.2H4c.6-.6 2-2.2 2-6.2z"/><path d="M10 18.5a2 2 0 0 0 4 0"/>',
+  crown: '<path d="M4 8.5 8 12l4-6.5 4 6.5 4-3.5-1.4 8.9a1 1 0 0 1-1 .84H6.4a1 1 0 0 1-1-.84z" stroke-linejoin="round"/>',
+  chevronLeft: '<polyline points="14.5 5 8 12 14.5 19"/>',
+  flame: '<path d="M12 3s-4.5 4-4.5 8.2A4.5 4.5 0 0 0 12 21a4.5 4.5 0 0 0 4.5-9.8c-.4 1.4-1.3 2.3-2.2 2.3.6-2.6-.4-5-1.8-6.7-.2 1.5-.9 2.6-1.7 3.2-.3-1.6-.9-3.2 1.2-7z" stroke-linejoin="round"/>',
+  pieChart: '<path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5H12z" stroke-linejoin="round"/><path d="M15.5 3.9A8.5 8.5 0 0 1 20.1 8.5H12z" stroke-linejoin="round"/>',
+  diamond: '<path d="M5 9 12 3l7 6-7 12z" stroke-linejoin="round"/><path d="M5 9h14M9 9l3 12 3-12" />',
 };
 
 /**

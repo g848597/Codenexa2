@@ -1,0 +1,202 @@
+/* ============================================================================
+   Profile Hub — "Профиль" переработан в центральный HUB экосистемы CodeNexa.
+   Только визуальный + структурный слой поверх токенов из tokens.css.
+   Все данные, которые здесь отображаются, приходят из реальных источников
+   (authApi.me/sessions/plans/billingStatus/referralStats, config/products.js,
+   state.js) — правило №1 проекта (честные пустые состояния, см. products.js,
+   state.js, config/trust.js) соблюдается и в этом модуле: там, где бэкенд
+   ещё не считает метрику, показывается честное "collecting/soon"-состояние,
+   а не придуманное число.
+   ========================================================================= */
+
+.hub-wrap { padding-bottom: 8px; }
+
+.hub-section { margin-bottom: 30px; animation: cardIn .45s var(--ease-out) both; }
+.hub-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.hub-section-title { font-family: var(--font-display); font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.hub-section-title svg { width: 18px; height: 18px; color: var(--ledger); }
+.hub-section-tag { font-size: 10.5px; color: var(--text-faint); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
+
+/* ---------------------------- Header ---------------------------------- */
+
+.hub-header { position: relative; padding: 22px 18px; margin-bottom: 22px; border-radius: var(--radius-lg); border: var(--border-glass); background: var(--gradient-surface), var(--bg-card); overflow: hidden; }
+.hub-header::before {
+  content: ''; position: absolute; inset: -40% -20% auto auto; width: 220px; height: 220px;
+  background: radial-gradient(circle, rgba(0,217,160,.22), transparent 70%); pointer-events: none;
+}
+.hub-header-row { display: flex; align-items: center; gap: 16px; position: relative; z-index: 1; }
+.hub-avatar-ring {
+  position: relative; width: 68px; height: 68px; flex: none; border-radius: 50%;
+  padding: 3px; background: conic-gradient(from 0deg, var(--ledger), var(--steel), var(--violet), var(--ledger));
+  animation: hubRingSpin 6s linear infinite;
+}
+.hub-avatar-ring.paused { animation: none; }
+@keyframes hubRingSpin { to { transform: rotate(360deg); } }
+.hub-avatar {
+  width: 100%; height: 100%; border-radius: 50%; background: var(--bg-elevated); display: flex; align-items: center;
+  justify-content: center; font-family: var(--font-display); font-size: 24px; font-weight: 600; color: var(--text);
+  overflow: hidden; border: 2px solid var(--bg-card);
+}
+.hub-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.hub-id { min-width: 0; flex: 1; }
+.hub-name { font-family: var(--font-display); font-size: 19px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-handle { font-size: 12px; color: var(--text-dim); margin-top: 2px; font-family: var(--font-mono); }
+.hub-tier { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 4px 10px 4px 8px; border-radius: 12px; margin-top: 8px; letter-spacing: .02em; }
+.hub-tier svg { width: 12px; height: 12px; }
+.hub-tier.tier-member { background: var(--bg-elevated); color: var(--text-dim); border: 1px solid var(--line-strong); }
+.hub-tier.tier-premium { background: var(--gradient-ledger); color: var(--on-ledger); box-shadow: var(--glow-ledger); }
+.hub-tier.tier-founder { background: var(--gradient-violet, linear-gradient(135deg,#a996ff,var(--violet))); color: #fff; box-shadow: var(--glow-violet); }
+.hub-edit-btn {
+  flex: none; font-size: 12.5px; font-weight: 600; padding: 9px 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong); background: rgba(255,255,255,0.03); color: var(--text); cursor: pointer;
+  transition: border-color .2s var(--ease), background .2s var(--ease); align-self: flex-start;
+}
+.hub-edit-btn:hover { border-color: var(--steel); background: var(--steel-dim); }
+
+/* ---------------------------- Ecosystem grid --------------------------- */
+
+.hub-eco-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 380px) { .hub-eco-grid { grid-template-columns: 1fr; } }
+
+.hub-eco-card {
+  position: relative; border-radius: var(--radius-md); border: var(--border-glass); background: var(--bg-elevated);
+  padding: 14px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; overflow: hidden;
+  transition: transform .2s var(--ease-spring), border-color .2s var(--ease), box-shadow .2s var(--ease);
+  animation: cardIn .4s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 45ms);
+}
+.hub-eco-card:hover { transform: translateY(-3px); border-color: var(--line-strong); box-shadow: var(--shadow-card-hover); }
+.hub-eco-card.is-connected { border-color: rgba(0,217,160,0.3); box-shadow: var(--glow-ledger); }
+.hub-eco-icon {
+  width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  background: var(--gradient-surface), var(--bg-card); border: 1px solid var(--line); color: var(--ledger);
+}
+.hub-eco-icon svg { width: 18px; height: 18px; }
+.hub-eco-name { font-family: var(--font-display); font-size: 14.5px; font-weight: 600; }
+.hub-eco-tagline { font-size: 11px; color: var(--text-faint); line-height: 1.4; min-height: 28px; }
+.hub-eco-status {
+  align-self: flex-start; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  padding: 3px 8px; border-radius: 8px; font-family: var(--font-mono);
+}
+.hub-eco-status.status-active { background: var(--ledger-dim); color: var(--ledger); }
+.hub-eco-status.status-available { background: var(--steel-dim); color: var(--steel); }
+.hub-eco-status.status-soon { background: var(--amber-dim); color: var(--amber); }
+.hub-eco-open {
+  margin-top: auto; font-size: 12px; font-weight: 600; color: var(--text); background: rgba(255,255,255,.04);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 8px; text-align: center;
+  transition: background .2s var(--ease), border-color .2s var(--ease);
+}
+.hub-eco-card:hover .hub-eco-open { border-color: var(--steel); background: var(--steel-dim); }
+
+/* ---------------------------- Subscription ------------------------------ */
+
+.hub-sub-card {
+  border-radius: var(--radius-lg); border: var(--border-glass); padding: 20px;
+  background: var(--gradient-surface), var(--bg-card); position: relative; overflow: hidden;
+}
+.hub-sub-card.is-premium { border-color: rgba(0,217,160,0.3); box-shadow: var(--glow-ledger); }
+.hub-sub-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.hub-sub-plan { font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+.hub-sub-badge { font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 10px; font-family: var(--font-mono); text-transform: uppercase; }
+.hub-sub-badge.active { background: var(--ledger-dim); color: var(--ledger); }
+.hub-sub-badge.inactive { background: var(--bg-elevated); color: var(--text-faint); border: 1px solid var(--line); }
+.hub-sub-meta { display: flex; flex-wrap: wrap; gap: 16px; margin: 14px 0 4px; }
+.hub-sub-meta-item .num { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--text); display: block; }
+.hub-sub-meta-item .label { font-size: 10.5px; color: var(--text-faint); }
+.hub-sub-manage-btn {
+  margin-top: 14px; width: 100%; padding: 12px; border-radius: var(--radius-sm); font-weight: 700; font-size: 13px;
+  cursor: pointer; border: 1px solid var(--line-strong); background: rgba(255,255,255,.04); color: var(--text);
+}
+.hub-sub-manage-btn.primary { background: var(--gradient-ledger); color: var(--on-ledger); border: none; box-shadow: var(--glow-ledger); }
+
+/* ---------------------------- Activity stat grid ------------------------ */
+
+.hub-stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.hub-stat-card { border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--bg-elevated); padding: 14px; }
+.hub-stat-num { font-family: var(--font-mono); font-size: 21px; font-weight: 700; color: var(--text); }
+.hub-stat-num.dim { color: var(--text-faint); font-size: 12px; font-weight: 500; font-family: var(--font-body); }
+.hub-stat-label { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+
+/* ---------------------------- AI Center ---------------------------------- */
+
+.hub-ai-card {
+  border-radius: var(--radius-lg); border: 1px solid rgba(143,123,255,0.28); padding: 18px;
+  background: linear-gradient(160deg, rgba(143,123,255,0.09), rgba(143,123,255,0.02)), var(--bg-card);
+  display: flex; gap: 14px; align-items: flex-start;
+}
+.hub-ai-icon {
+  flex: none; width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center;
+  background: var(--gradient-violet); color: #fff; box-shadow: var(--glow-violet);
+}
+.hub-ai-icon svg { width: 20px; height: 20px; }
+.hub-ai-title { font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.hub-ai-text { font-size: 12.5px; color: var(--text-dim); line-height: 1.55; }
+.hub-ai-bar-track { height: 6px; border-radius: 4px; background: var(--bg-elevated); margin-top: 12px; overflow: hidden; }
+.hub-ai-bar-fill { height: 100%; border-radius: 4px; background: var(--gradient-violet); transition: width .6s var(--ease-out); }
+.hub-ai-cta { margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--violet); cursor: pointer; background: none; border: none; padding: 0; }
+
+/* ---------------------------- Achievements ------------------------------- */
+
+.hub-ach-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 380px) { .hub-ach-grid { grid-template-columns: repeat(2, 1fr); } }
+.hub-ach {
+  border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--bg-elevated); padding: 12px 8px;
+  text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  transition: transform .2s var(--ease-spring), border-color .2s var(--ease);
+}
+.hub-ach.unlocked { border-color: rgba(240,169,58,0.35); background: linear-gradient(160deg, rgba(240,169,58,0.08), transparent), var(--bg-elevated); }
+.hub-ach.unlocked:hover { transform: translateY(-2px); }
+.hub-ach-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-card); color: var(--text-faint); }
+.hub-ach.unlocked .hub-ach-icon { background: var(--gradient-amber, linear-gradient(135deg,#ffce7a,var(--amber))); color: var(--on-amber); }
+.hub-ach-icon svg { width: 16px; height: 16px; }
+.hub-ach-label { font-size: 10px; color: var(--text-faint); line-height: 1.3; }
+.hub-ach.unlocked .hub-ach-label { color: var(--text-dim); }
+
+/* ---------------------------- Referral ----------------------------------- */
+
+.hub-ref-card { border-radius: var(--radius-lg); border: var(--border-glass); background: var(--bg-card); padding: 18px; }
+.hub-ref-link-row { display: flex; gap: 8px; margin: 12px 0; }
+.hub-ref-link-input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 11.5px; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px dashed var(--line-strong); background: var(--bg-elevated); color: var(--text-dim); }
+.hub-ref-copy-btn { flex: none; padding: 10px 14px; border-radius: var(--radius-sm); border: none; background: var(--gradient-ledger); color: var(--on-ledger); font-weight: 700; font-size: 12.5px; cursor: pointer; box-shadow: var(--glow-ledger); }
+.hub-ref-stats { display: flex; gap: 16px; }
+.hub-ref-stat .num { font-family: var(--font-mono); font-size: 18px; font-weight: 700; }
+.hub-ref-stat .label { font-size: 10.5px; color: var(--text-faint); }
+
+/* ---------------------------- Generic list rows (settings/support) ------- */
+
+.hub-row-list { border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--bg-elevated); overflow: hidden; }
+.hub-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--line); cursor: pointer; background: none; width: 100%; text-align: left; color: var(--text); font-size: 13px; }
+.hub-row:last-child { border-bottom: none; }
+.hub-row:hover { background: rgba(255,255,255,.03); }
+.hub-row-icon { flex: none; width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--bg-card); color: var(--text-dim); }
+.hub-row-icon svg { width: 16px; height: 16px; }
+.hub-row-main { flex: 1; min-width: 0; }
+.hub-row-title { font-weight: 500; }
+.hub-row-sub { font-size: 11px; color: var(--text-faint); margin-top: 1px; }
+.hub-row-value { font-size: 12px; color: var(--text-faint); flex: none; }
+.hub-row-chevron { flex: none; color: var(--text-faint); }
+.hub-row-chevron svg { width: 14px; height: 14px; transform: rotate(180deg); }
+
+.hub-toggle { position: relative; width: 38px; height: 22px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--line-strong); flex: none; cursor: pointer; transition: background .2s var(--ease); }
+.hub-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--text-faint); transition: transform .2s var(--ease-spring), background .2s var(--ease); }
+.hub-toggle.on { background: var(--ledger-dim); border-color: var(--ledger); }
+.hub-toggle.on::after { transform: translateX(16px); background: var(--ledger); }
+
+/* ---------------------------- Ecosystem CTA banner ----------------------- */
+
+.hub-banner {
+  position: relative; border-radius: var(--radius-lg); border: var(--border-glass); padding: 28px 20px;
+  background: radial-gradient(120% 140% at 20% 0%, rgba(0,217,160,0.14), transparent 55%),
+              radial-gradient(120% 140% at 90% 100%, rgba(143,123,255,0.14), transparent 55%), var(--bg-card);
+  overflow: hidden; text-align: center;
+}
+.hub-banner-net { position: absolute; inset: 0; opacity: .55; pointer-events: none; }
+.hub-banner-mark { font-family: var(--font-display); font-size: 22px; font-weight: 600; letter-spacing: .01em; position: relative; z-index: 1; }
+.hub-banner-line { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-dim); margin-top: 10px; position: relative; z-index: 1; }
+.hub-banner-line b { color: var(--ledger); }
+
+/* ---------------------------- Notices / empty states --------------------- */
+
+.hub-notice { font-size: 12px; padding: 9px 12px; border-radius: var(--radius-sm); margin-top: 8px; }
+.hub-notice.ok { background: var(--ledger-dim); color: var(--ledger); }
+.hub-notice.err { background: var(--danger-dim); color: var(--danger-text); }
+.hub-empty-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; }

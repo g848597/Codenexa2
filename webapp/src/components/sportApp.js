@@ -5,6 +5,7 @@
 // виртуального DOM, render() каждый раз перерисовывает верхний экран целиком.
 
 import { sportApi, SportApiError } from '../config/sportApi.js';
+import { authApi } from '../api/authApi.js';
 import { haptic } from '../telegram.js';
 import { captureReturnTarget, getReturnTarget, reopenProductIfNeeded } from '../navigation.js';
 import { esc } from '../utils/html.js';
@@ -150,6 +151,7 @@ export function openSportApp() {
   screenStack = [{ name: 'home' }];
   homeState = { popular: null, error: null };
   homeLive = { matches: null, loaded: false };
+  plansState = { plans: null };
   searchState = { query: '', results: null, loading: false, error: null };
   render();
   refreshLiveBadge();
@@ -196,10 +198,24 @@ function render() {
 
   root.innerHTML = `
     <div class="sport-app">
+      ${canGoBack ? `
       <div class="sa-topbar">
-        ${canGoBack ? backButtonHTML(screen.name === 'home' ? 'Экосистема' : 'Назад') : `<button class="sa-back" data-sa-exit>← К экосистеме</button>`}
+        ${backButtonHTML('Назад')}
         <div class="sa-brand">${icon('ball')} AI Sport</div>
-      </div>
+      </div>` : `
+      <div class="sa-header">
+        <button class="sa-header-left" data-sa-exit aria-label="К экосистеме CodeNexa">
+          <span class="sa-avatar">CN</span>
+          <span class="sa-header-titles">
+            <span class="sa-header-title">AI Sport</span>
+            <span class="sa-header-sub">by CodeNexa</span>
+          </span>
+        </button>
+        <div class="sa-header-right">
+          <button class="sa-pro-pill" data-open-pro>${icon('crown')} PRO</button>
+          <button class="sa-bell-btn" data-go-live aria-label="Live-матчи">${icon('bell')}${liveCount > 0 ? '<span class="sa-bell-dot"></span>' : ''}</button>
+        </div>
+      </div>`}
       <div class="sa-body">${inner}</div>
     </div>`;
 
@@ -230,6 +246,7 @@ function wireCommon() {
 
 let homeState = { popular: null, error: null };
 let homeLive = { matches: null, loaded: false };
+let plansState = { plans: null }; // реальные тарифы — authApi.plans() (см. accountApp.js/billingHTML)
 
 function renderHome() {
   if (!homeState.popular && !homeState.error) {
@@ -253,45 +270,64 @@ function renderHome() {
     ? `<div class="sa-hint-block">Источник живых данных (api-football) пока не подключён на сервере — показываем команды по названиям без гербов и статистики. Как только появится ключ API, здесь честно появятся реальные данные.</div>`
     : '';
 
-  let liveSection;
-  if (!homeLive.loaded) {
-    liveSection = '';
-  } else if (homeLive.matches && homeLive.matches.length) {
+  let liveSection = '';
+  if (homeLive.loaded && homeLive.matches && homeLive.matches.length) {
     liveSection = `
     <div class="sa-section-head"><h2>Матчи сейчас <span class="sa-live-dot"></span></h2></div>
     <div class="sa-fixture-list">${homeLive.matches.slice(0, 3).map(fixtureRowHTML).join('')}</div>`;
-  } else if (apiConfigured !== false) {
-    liveSection = `<div class="sa-empty-mini">Live-матчей прямо сейчас нет — загляните позже, табло обновляется автоматически.</div>`;
-  } else {
-    liveSection = '';
   }
 
+  // Тарифы: реальные данные из /api/billing/plans (то же, что в личном
+  // кабинете) — до 3 карточек, средняя помечена как рекомендованная, чтобы
+  // визуально повторить макет-референс без выдуманных цен.
+  const plans = (plansState.plans || []).slice(0, 3);
+  const plansSection = plans.length ? `
+  <div class="sa-section-head sa-plans-head">
+    <h2>Выберите подписку</h2>
+    <button class="sa-link-btn" data-open-pro>Все тарифы ${icon('arrowRight')}</button>
+  </div>
+  <div class="sa-plan-row">
+    ${plans.map((p, i) => `
+      <button class="sa-plan-card ${i === 1 ? 'sa-plan-featured' : ''}" data-open-pro>
+        <span class="sa-plan-title">${esc(p.title)}</span>
+        <span class="sa-plan-price">$${esc(p.usd)}<em>/ ${esc(String(p.stars))} ${icon('star')}</em></span>
+        ${i === 1 ? `<span class="sa-plan-badge">${icon('star')} Популярный</span>` : ''}
+      </button>`).join('')}
+  </div>` : '';
+
   return `
-  <div class="sa-hero2">
-    <div class="sa-hero2-badge">${icon('ball')} Живые данные, без прогнозов "на глаз"</div>
-    <h1 class="sa-hero2-title">Команды, live-счёт<br>и статистика — в одном месте</h1>
-    <p class="sa-hero2-sub">Ищите клуб, смотрите форму и ближайшие матчи по реальным данным api-football — без выдуманных коэффициентов.</p>
+  <div class="sa-hero">
+    <div class="sa-hero-badges">
+      <div class="sa-hero-stat"><span>${icon('ball')} Данные</span><strong>api-football</strong></div>
+      <div class="sa-hero-stat sa-hero-stat-roi"><span>${icon('bell')} Live сейчас</span><strong data-live-count>${liveCount}</strong></div>
+    </div>
+    <div class="sa-hero-ball" aria-hidden="true">${icon('ball')}</div>
+    <h1 class="sa-hero-title">Команды, live-счёт<br><em>и статистика клубов.</em></h1>
+    <p class="sa-hero-sub">Ищите клуб, смотрите форму и ближайшие матчи по реальным данным api-football — без выдуманных прогнозов и коэффициентов.</p>
+
     <div class="sa-search-row">
       <input type="text" class="sa-search-input" placeholder="Найти команду… например, Реал Мадрид" data-search-input>
       <button class="sa-search-btn" data-search-go>Найти</button>
     </div>
-  </div>
 
-  <div class="sa-action-row">
-    <button class="sa-action-btn sa-action-primary" data-go-live>${icon('zap')} Live-матчи</button>
-    <button class="sa-action-btn" data-scroll-teams>${icon('trophy')} Топ клубы</button>
-    <button class="sa-action-btn" data-open-pro>${icon('creditCard')} PRO-тарифы</button>
+    <div class="sa-action-row">
+      <button class="sa-action-btn sa-action-primary" data-go-live>${icon('zap')} Live-матчи</button>
+      <button class="sa-action-btn" data-scroll-teams>${icon('trophy')} Топ клубы</button>
+      <button class="sa-action-btn" data-open-pro>${icon('crown')} PRO-тарифы</button>
+    </div>
   </div>
 
   <div class="sa-tile-grid">
-    <button class="sa-tile" data-scroll-teams>${icon('trophy')}<span>Топ клубы</span><em>Аналитика</em></button>
+    <button class="sa-tile" data-scroll-teams>${icon('trophy')}<span>Топ клубы</span><em>Список</em></button>
     <button class="sa-tile" data-go-live>${icon('calendar')}<span>Live сейчас</span><em data-live-count>${liveCount}</em></button>
     <button class="sa-tile" data-focus-search>${icon('search')}<span>Поиск</span><em>Любой клуб</em></button>
     <button class="sa-tile" data-open-pro>${icon('layers')}<span>PRO-тарифы</span><em>Подписка</em></button>
     <button class="sa-tile sa-tile-exit" data-sa-exit>${icon('globe')}<span>Экосистема</span><em>CodeNexa</em></button>
   </div>
 
-  ${liveSection}
+  ${plansSection}
+
+  ${liveSection || (apiConfigured !== false ? `<div class="sa-empty-mini">Live-матчей прямо сейчас нет — загляните позже, табло обновляется автоматически.</div>` : '')}
 
   ${configuredHint}
 
@@ -301,13 +337,15 @@ function renderHome() {
 
 async function loadHomeAsync() {
   try {
-    const [popularData, statusData, liveData] = await Promise.all([
+    const [popularData, statusData, liveData, plansData] = await Promise.all([
       sportApi.popularTeams(),
       sportApi.status(),
       sportApi.liveMatches().catch(() => null),
+      authApi.plans().catch(() => ({ plans: [] })),
     ]);
     apiConfigured = statusData.configured;
     homeState = { popular: popularData.teams, error: null };
+    plansState = { plans: plansData.plans || [] };
     if (liveData) {
       homeLive = { matches: liveData.matches, loaded: true };
       liveCount = (liveData.matches || []).length;
@@ -342,14 +380,12 @@ function wireHome() {
   if (goBtn) goBtn.addEventListener('click', doSearch);
   if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
 
-  const liveBtn = root.querySelector('[data-go-live]');
-  if (liveBtn) liveBtn.addEventListener('click', () => { haptic('light'); push('live'); });
+  root.querySelectorAll('[data-go-live]').forEach((btn) => btn.addEventListener('click', () => { haptic('light'); push('live'); }));
 
   const focusSearchBtn = root.querySelector('[data-focus-search]');
   if (focusSearchBtn) focusSearchBtn.addEventListener('click', () => { haptic('light'); input?.focus(); input?.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
 
-  const scrollTeamsBtn = root.querySelectorAll('[data-scroll-teams]');
-  scrollTeamsBtn.forEach((btn) => btn.addEventListener('click', () => {
+  root.querySelectorAll('[data-scroll-teams]').forEach((btn) => btn.addEventListener('click', () => {
     haptic('light');
     document.getElementById('sa-teams-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
@@ -357,12 +393,11 @@ function wireHome() {
   // Реальные тарифы/оплата уже реализованы в личном кабинете (см.
   // accountApp.js, billingHTML() — там же настоящие цены и checkout) —
   // здесь просто переводим на ту же вкладку, а не дублируем логику оплаты.
-  const proBtn = root.querySelector('[data-open-pro]');
-  if (proBtn) proBtn.addEventListener('click', () => {
+  root.querySelectorAll('[data-open-pro]').forEach((btn) => btn.addEventListener('click', () => {
     haptic('light');
     closeSportApp();
     document.querySelector('.tab[data-view="account"]')?.click();
-  });
+  }));
 }
 
 // =========================================================================
