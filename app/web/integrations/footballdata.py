@@ -68,7 +68,14 @@ async def _get(path: str, params: dict | None = None, cache_key: str | None = No
             if res.status_code == 429:
                 raise SportProviderError("footballdata.io: превышен лимит запросов", 429, rate_limited=True)
             res.raise_for_status()
-            data = res.json()
+            try:
+                data = res.json()
+            except ValueError as e:
+                # Не-JSON ответ (например HTML-страница ошибки, если
+                # FOOTBALLDATA_BASE_URL указывает не туда) — раньше это
+                # падало необработанным исключением наружу и превращалось в
+                # 500 у пользователя вместо понятной ошибки.
+                raise SportProviderError(f"footballdata.io вернул не-JSON ответ: {e}", 502, rate_limited=True)
             if cache_key:
                 _cache_set(cache_key, data)
             return data
@@ -81,6 +88,8 @@ async def _get(path: str, params: dict | None = None, cache_key: str | None = No
             if attempt < settings.SPORT_API_RETRIES and settings.SPORT_REQUEST_DELAY_MS:
                 await asyncio.sleep(settings.SPORT_REQUEST_DELAY_MS / 1000)
             continue
+        except Exception as e:  # noqa: BLE001 — последний рубеж: источник не должен уронить весь эндпоинт 500-й ошибкой
+            raise SportProviderError(f"footballdata.io: непредвиденная ошибка ({type(e).__name__}: {e})", 502, rate_limited=True)
 
     raise SportProviderError(f"Не удалось связаться с footballdata.io: {last_err}", 502, rate_limited=True)
 

@@ -65,7 +65,10 @@ async def _get(path: str, params: dict | None = None, cache_key: str | None = No
             if res.status_code == 429:
                 raise SportProviderError("clearsportsapi.com: превышен лимит запросов", 429, rate_limited=True)
             res.raise_for_status()
-            data = res.json()
+            try:
+                data = res.json()
+            except ValueError as e:
+                raise SportProviderError(f"clearsportsapi.com вернул не-JSON ответ: {e}", 502, rate_limited=True)
             if cache_key:
                 _cache_set(cache_key, data)
             return data
@@ -81,6 +84,8 @@ async def _get(path: str, params: dict | None = None, cache_key: str | None = No
             if attempt < settings.SPORT_API_RETRIES and settings.SPORT_REQUEST_DELAY_MS:
                 await asyncio.sleep(settings.SPORT_REQUEST_DELAY_MS / 1000)
             continue
+        except Exception as e:  # noqa: BLE001 — последний рубеж: источник не должен уронить весь эндпоинт 500-й ошибкой
+            raise SportProviderError(f"clearsportsapi.com: непредвиденная ошибка ({type(e).__name__}: {e})", 502, rate_limited=True)
 
     raise SportProviderError(f"Не удалось связаться с clearsportsapi.com: {last_err}", 502, rate_limited=True)
 

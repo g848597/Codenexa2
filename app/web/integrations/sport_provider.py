@@ -38,6 +38,9 @@ async def _call(method_name: str, *args, **kwargs):
         except SportProviderError as e:
             last_err = e
             continue  # следующий источник в очереди
+        except Exception as e:  # noqa: BLE001 — баг в разборе одного источника не должен ронять весь эндпоинт
+            last_err = SportProviderError(f"{provider.__name__}: непредвиденная ошибка ({type(e).__name__}: {e})", 502, rate_limited=True)
+            continue
 
     raise last_err
 
