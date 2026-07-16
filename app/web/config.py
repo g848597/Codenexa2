@@ -96,6 +96,18 @@ class Settings:
     # что и CRYPTOBOT_API_TOKEN — так требует Crypto Pay API.
     CRYPTOBOT_WEBHOOK_SECRET = CRYPTOBOT_API_TOKEN
 
+    # AI Sport (см. app/web/integrations/footballdata.py, app/web/api/sport_routes.py).
+    # Источник — footballdata.io (документация: https://footballdata.io/documentation/).
+    # Без ключа модуль работает в режиме "не настроено" — /api/sport/status
+    # честно вернёт configured=false, фронтенд покажет соответствующее
+    # сообщение вместо ошибки (см. sportApp.js).
+    FOOTBALLDATA_API_KEY = os.getenv("FOOTBALLDATA_API_KEY", "")
+    FOOTBALLDATA_BASE_URL = os.getenv("FOOTBALLDATA_BASE_URL", "https://footballdata.io/api/v1")
+    SPORT_API_TIMEOUT = float(os.getenv("API_TIMEOUT", "10"))
+    SPORT_API_RETRIES = int(os.getenv("API_RETRIES", "2"))
+    SPORT_CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))
+    SPORT_REQUEST_DELAY_MS = int(os.getenv("REQUEST_DELAY_MS", "0"))
+
     JWT_SECRET = _resolve_jwt_secret()
     JWT_TTL_DAYS = int(os.getenv("JWT_TTL_DAYS", "30"))
 
