@@ -9,6 +9,18 @@ load_dotenv()
 ENV = os.getenv("ENV", "development").strip().lower()  # "development" | "staging" | "production"
 
 
+def _clean_env(name: str, default: str = "") -> str:
+    """os.getenv() + защита от "красивых" кавычек, которые мобильные
+    клавиатуры (Gboard и т.п.) подставляют вместо обычных при ручном вводе
+    значений в Raw Editor Railway. Прямые кавычки Railway распознаёт и сам
+    убирает как обрамление, а вот кавычки-ёлочки/лапки — нет, и они остаются
+    частью значения, ломая любой заголовок/URL, где используются (см. чат:
+    UnicodeEncodeError при обращении к внешнему API из-за этого).
+    """
+    value = os.getenv(name, default)
+    return value.strip().strip("\"'\u201c\u201d\u2018\u2019\u00ab\u00bb")
+
+
 # Раунд 8 (аудит, раздел 9, "DevOps: нет staging-окружения"): ENV="staging"
 # теперь первоклассное значение, не просто "ещё одна production-строка,
 # которую никто не проверял". По требованиям безопасности (secure-cookie,
@@ -85,12 +97,12 @@ class Settings:
 
     SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 
-    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")
-    TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
+    TELEGRAM_BOT_TOKEN = _clean_env("TELEGRAM_BOT_TOKEN")
+    TELEGRAM_BOT_USERNAME = _clean_env("TELEGRAM_BOT_USERNAME")
+    TELEGRAM_WEBHOOK_SECRET = _clean_env("TELEGRAM_WEBHOOK_SECRET")
 
-    CRYPTOBOT_API_TOKEN = os.getenv("CRYPTOBOT_API_TOKEN", "")
-    CRYPTOBOT_NETWORK = os.getenv("CRYPTOBOT_NETWORK", "mainnet")
+    CRYPTOBOT_API_TOKEN = _clean_env("CRYPTOBOT_API_TOKEN")
+    CRYPTOBOT_NETWORK = _clean_env("CRYPTOBOT_NETWORK", "mainnet")
     # HMAC-подпись вебхуков CryptoBot проверяется этим секретом (см.
     # integrations/cryptobot.py::verify_webhook_signature). Это ТОТ ЖЕ токен,
     # что и CRYPTOBOT_API_TOKEN — так требует Crypto Pay API.
@@ -101,13 +113,13 @@ class Settings:
     # Без ключа модуль работает в режиме "не настроено" — /api/sport/status
     # честно вернёт configured=false, фронтенд покажет соответствующее
     # сообщение вместо ошибки (см. sportApp.js).
-    FOOTBALLDATA_API_KEY = os.getenv("FOOTBALLDATA_API_KEY", "")
-    FOOTBALLDATA_BASE_URL = os.getenv("FOOTBALLDATA_BASE_URL", "https://footballdata.io/api/v1")
+    FOOTBALLDATA_API_KEY = _clean_env("FOOTBALLDATA_API_KEY")
+    FOOTBALLDATA_BASE_URL = _clean_env("FOOTBALLDATA_BASE_URL", "https://footballdata.io/api/v1")
     # Второй источник в цепочке (см. app/web/integrations/sport_provider.py) —
     # подключается автоматически, когда footballdata.io исчерпает лимит или
     # ответит ошибкой.
-    CLEARSPORTS_API_KEY = os.getenv("CLEARSPORTS_API_KEY", "")
-    CLEARSPORTS_BASE_URL = os.getenv("CLEARSPORTS_BASE_URL", "https://api.clearsportsapi.com/v1")
+    CLEARSPORTS_API_KEY = _clean_env("CLEARSPORTS_API_KEY")
+    CLEARSPORTS_BASE_URL = _clean_env("CLEARSPORTS_BASE_URL", "https://api.clearsportsapi.com/v1")
     SPORT_API_TIMEOUT = float(os.getenv("API_TIMEOUT", "10"))
     SPORT_API_RETRIES = int(os.getenv("API_RETRIES", "2"))
     SPORT_CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))
@@ -167,7 +179,9 @@ class Settings:
         e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()
     }
     ADMIN_TELEGRAM_IDS = {
-        t.strip() for t in os.getenv("ADMIN_TELEGRAM_IDS", "").split(",") if t.strip()
+        t.strip().strip("\"'\u201c\u201d\u2018\u2019\u00ab\u00bb")
+        for t in _clean_env("ADMIN_TELEGRAM_IDS").split(",")
+        if t.strip()
     }
 
     # === Реферальная программа (раунд 8, аудит, раздел 13 "Средний
