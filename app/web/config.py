@@ -215,8 +215,43 @@ class Settings:
         False только для 'development' (раунд 8, аудит раздел 9)."""
         return _is_production_like(self.ENV)
 
+    # === Email (задача 3, CODENEXA_TASKLIST.md): подтверждение почты и сброс
+    # пароля по одноразовому 6-значному коду (см. app/web/email.py,
+    # app/web/security.py::generate_otp_code, app/web/api/auth.py). SMTP, а не
+    # транзакционный провайдер (SendGrid/Postmark/Resend и т.п.) — сознательный
+    # выбор для старта: ноль внешних SaaS-зависимостей и ключей API, письма
+    # уходят напрямую через ящик компании. Если объём вырастет настолько, что
+    # Gmail начнёт душить лимитами (~500 писем/сутки на обычный ящик) или
+    # понадобится DKIM/аналитика доставляемости — см. README_BACKEND.md,
+    # раздел про email, там описан путь миграции на транзакционного провайдера
+    # без изменения кода эндпоинтов (email.py — единственная точка отправки).
+    SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+    # Адрес и отображаемое имя в поле "От" — по умолчанию тот же ящик, что
+    # логинится по SMTP (Gmail всё равно перезаписывает "From" на адрес
+    # аккаунта, если он не совпадает и не добавлен как алиас).
+    SMTP_FROM = os.getenv("SMTP_FROM", "") or SMTP_USER
+    # Код действителен ограниченное время — коротко, т.к. это OTP, а не
+    # ссылка, которую могут открыть через день после письма.
+    OTP_TTL_SECONDS = int(os.getenv("OTP_TTL_SECONDS", str(15 * 60)))
+
+    @property
+    def smtp_configured(self):
+        return bool(self.SMTP_HOST and self.SMTP_USER and self.SMTP_PASSWORD)
+
 
 settings = Settings()
+
+if not settings.smtp_configured:
+    # Не фатально ни в одном ENV: без SMTP подтверждение email и сброс пароля
+    # по коду просто не смогут отправить письмо (auth.py логирует это и
+    # отвечает тем же самым "универсальным" ответом, что и при успехе — см.
+    # комментарий в auth.py про защиту от enumeration), остальной сервис
+    # продолжает работать.
+    print("[config] ВНИМАНИЕ: SMTP не настроен (SMTP_USER/SMTP_PASSWORD) — "
+          "письма подтверждения email и сброса пароля отправляться не будут")
 
 if not settings.TELEGRAM_BOT_TOKEN:
     # Не роняем импорт — но громко предупреждаем в логах, т.к. без токена

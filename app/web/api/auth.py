@@ -5,11 +5,12 @@ import time
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, EmailStr, field_validator
 
+from app.web import email as email_service
 from app.web import referrals, repo, security
 from app.web.api.telegram_auth import validate_init_data
 from app.web.cache import get_redis
@@ -27,6 +28,15 @@ logger = logging.getLogger("codenexa.auth")
 _attempts: dict[str, list[float]] = {}
 RATE_LIMIT_WINDOW = 15 * 60
 RATE_LIMIT_MAX = 8
+
+# Задача 3 (CODENEXA_TASKLIST.md): максимум неверных попыток ввода ОДНОГО
+# конкретного OTP-кода (подтверждение email / сброс пароля), прежде чем этот
+# код "сгорает" и нужно запрашивать новый. Отдельно от RATE_LIMIT_MAX выше —
+# тот ограничивает частоту запросов к эндпоинту вообще (по email/IP), этот —
+# сколько раз можно ошибиться с уже выданным 6-значным кодом (у которого
+# всего 10^6 комбинаций, поэтому лимит попыток обязателен даже при коротком
+# TTL).
+MAX_OTP_ATTEMPTS = 5
 
 
 def _rate_limit_memory(key: str):
@@ -93,6 +103,7 @@ def _public_user(user: dict) -> dict:
         "hasGoogle": bool(user.get("google_id")),
         "hasYandex": bool(user.get("yandex_id")),
         "hasPassword": bool(user.get("password_hash")),
+        "emailVerified": bool(user.get("email_verified")),
         "twoFaEnabled": bool(user.get("totp_enabled")),
         "createdAt": user.get("created_at"),
         "isAdmin": is_admin_user(user),
@@ -246,6 +257,133 @@ def change_password(body: ChangePasswordBody, user: dict = Depends(get_current_u
         if not body.currentPassword or not security.verify_password(body.currentPassword, user["password_hash"]):
             raise HTTPException(status_code=401, detail="Текущий пароль неверен")
     repo.update_user(user["id"], password_hash=security.hash_password(body.newPassword))
+    return {"ok": True}
+
+
+# ---------- Подтверждение email (задача 3, CODENEXA_TASKLIST.md) ----------
+# Одноразовый 6-значный код, а не ссылка: короче до "введите то, что пришло
+# на почту", не требует отдельной веб-страницы для перехода по ссылке и
+# одинаково работает что в мини-аппе Telegram, что в обычном браузере.
+
+@router.post("/verify-email/request")
+def request_email_verification(
+    request: Request, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)
+):
+    if not user.get("email"):
+        raise HTTPException(status_code=400, detail="К аккаунту не привязан email")
+    if user.get("email_verified"):
+        return {"ok": True, "alreadyVerified": True}
+    _rate_limit(f"verify-email-request:{user['id']}:{_client_ip(request)}")
+
+    code = security.generate_otp_code()
+    repo.create_otp_code(
+        user_id=user["id"],
+        purpose="verify_email",
+        code_hash=security.hash_otp_code(code),
+        ttl_seconds=settings.OTP_TTL_SECONDS,
+    )
+    subject, html, text = email_service.build_verify_email_message(code)
+    background_tasks.add_task(email_service.send_email, user["email"], subject, html, text)
+    return {"ok": True}
+
+
+class ConfirmEmailBody(BaseModel):
+    code: str
+
+
+@router.post("/verify-email/confirm")
+def confirm_email_verification(
+    body: ConfirmEmailBody, request: Request, user: dict = Depends(get_current_user)
+):
+    if user.get("email_verified"):
+        return {"ok": True, "alreadyVerified": True}
+    _rate_limit(f"verify-email-confirm:{user['id']}:{_client_ip(request)}")
+
+    otp = repo.get_active_otp_code(user["id"], "verify_email")
+    if not otp:
+        raise HTTPException(status_code=400, detail="Код недействителен или истёк — запросите новый")
+    if not security.verify_otp_code(body.code, otp["code_hash"]):
+        attempts = repo.register_otp_attempt(otp["id"])
+        if attempts >= MAX_OTP_ATTEMPTS:
+            repo.consume_otp_code(otp["id"])
+            raise HTTPException(status_code=400, detail="Слишком много неверных попыток — запросите новый код")
+        raise HTTPException(status_code=401, detail="Неверный код")
+
+    repo.consume_otp_code(otp["id"])
+    repo.update_user(user["id"], email_verified=True)
+    return {"ok": True}
+
+
+# ---------- Сброс пароля по коду из письма ----------
+# Ответы намеренно ОДИНАКОВЫЕ независимо от того, существует ли email в
+# системе (см. return в конце forgot_password) — иначе эндпоинт превращается
+# в способ проверить, зарегистрирован ли конкретный адрес (user enumeration).
+
+class ForgotPasswordBody(BaseModel):
+    email: EmailStr
+
+
+@router.post("/password/forgot")
+def forgot_password(body: ForgotPasswordBody, request: Request, background_tasks: BackgroundTasks):
+    _rate_limit(f"password-forgot:{body.email.lower()}:{_client_ip(request)}")
+
+    user = repo.get_user_by_email(body.email)
+    if user:
+        code = security.generate_otp_code()
+        repo.create_otp_code(
+            user_id=user["id"],
+            purpose="reset_password",
+            code_hash=security.hash_otp_code(code),
+            ttl_seconds=settings.OTP_TTL_SECONDS,
+        )
+        subject, html, text = email_service.build_password_reset_message(code)
+        background_tasks.add_task(email_service.send_email, user["email"], subject, html, text)
+
+    return {"ok": True, "message": "Если такой email зарегистрирован, мы отправили код для сброса пароля"}
+
+
+class ResetPasswordBody(BaseModel):
+    email: EmailStr
+    code: str
+    newPassword: str
+
+    @field_validator("newPassword")
+    @classmethod
+    def strength(cls, v):
+        if len(v) < 8:
+            raise ValueError("Пароль должен быть не короче 8 символов")
+        return v
+
+
+@router.post("/password/reset")
+def reset_password(body: ResetPasswordBody, request: Request):
+    _rate_limit(f"password-reset:{body.email.lower()}:{_client_ip(request)}")
+
+    user = repo.get_user_by_email(body.email)
+    # Намеренно тот же текст ошибки для "нет такого пользователя" и "код
+    # неверен/истёк" — иначе разница в ответах позволяла бы перебором узнать,
+    # какие email зарегистрированы (см. комментарий к forgot_password выше).
+    generic_error = HTTPException(status_code=400, detail="Неверный или истёкший код")
+    if not user:
+        raise generic_error
+
+    otp = repo.get_active_otp_code(user["id"], "reset_password")
+    if not otp:
+        raise generic_error
+    if not security.verify_otp_code(body.code, otp["code_hash"]):
+        attempts = repo.register_otp_attempt(otp["id"])
+        if attempts >= MAX_OTP_ATTEMPTS:
+            repo.consume_otp_code(otp["id"])
+        raise generic_error
+
+    repo.consume_otp_code(otp["id"])
+    repo.update_user(user["id"], password_hash=security.hash_password(body.newPassword))
+    # Смена пароля через сброс — веский повод отозвать все существующие
+    # сессии (тот же принцип, что и логика "выйти на всех устройствах"):
+    # если пароль сбрасывали не сам владелец аккаунта, а тот, кто получил
+    # доступ к почте, старые сессии легитимного владельца всё равно останутся
+    # активными без этого шага.
+    repo.revoke_all_sessions(user["id"])
     return {"ok": True}
 
 

@@ -553,6 +553,59 @@ def consume_oauth_code(code: str):
     return row_to_dict(row)
 
 
+# --- OTP-коды: подтверждение email и сброс пароля (задача 3,
+# CODENEXA_TASKLIST.md). Общая таблица auth_otp_codes с полем `purpose`
+# вместо двух похожих таблиц — верификация и сброс пароля отличаются только
+# тем, что происходит ПОСЛЕ успешной проверки кода (auth.py), а не механикой
+# хранения/TTL/попыток самого кода. ---
+
+def create_otp_code(user_id: int, purpose: str, code_hash: str, ttl_seconds: int):
+    """Гасит все ранее выданные, ещё не использованные коды этого purpose для
+    пользователя (запрос нового кода делает предыдущий недействительным — иначе
+    в таблице накапливались бы несколько параллельно "живых" кодов, из которых
+    подошёл бы любой) и создаёт новый."""
+    with tx() as conn:
+        conn.execute(
+            "UPDATE auth_otp_codes SET consumed = TRUE "
+            "WHERE user_id = ? AND purpose = ? AND consumed = FALSE",
+            (user_id, purpose),
+        )
+        cur = conn.execute(
+            "INSERT INTO auth_otp_codes (user_id, purpose, code_hash, expires_at) "
+            "VALUES (?, ?, ?, NOW() + make_interval(secs => ?))",
+            (user_id, purpose, code_hash, ttl_seconds),
+        )
+        row = conn.execute("SELECT * FROM auth_otp_codes WHERE id = ?", (cur.lastrowid,)).fetchone()
+        return row_to_dict(row)
+
+
+def get_active_otp_code(user_id: int, purpose: str):
+    """Последний ещё не использованный и не просроченный код данного purpose,
+    если он есть — на пользователя+purpose он максимум один (см.
+    create_otp_code выше)."""
+    return _fetch_one(
+        "SELECT * FROM auth_otp_codes WHERE user_id = ? AND purpose = ? "
+        "AND consumed = FALSE AND expires_at > NOW() "
+        "ORDER BY created_at DESC LIMIT 1",
+        (user_id, purpose),
+    )
+
+
+def register_otp_attempt(otp_id: int) -> int:
+    """Увеличивает счётчик неверных попыток для конкретного кода и возвращает
+    новое значение — вызывающий код (auth.py) решает, когда "сжечь" код
+    (см. MAX_OTP_ATTEMPTS), сама эта функция кода не инвалидирует."""
+    with tx() as conn:
+        conn.execute("UPDATE auth_otp_codes SET attempts = attempts + 1 WHERE id = ?", (otp_id,))
+    row = _fetch_one("SELECT attempts FROM auth_otp_codes WHERE id = ?", (otp_id,))
+    return row["attempts"] if row else 0
+
+
+def consume_otp_code(otp_id: int):
+    with tx() as conn:
+        conn.execute("UPDATE auth_otp_codes SET consumed = TRUE WHERE id = ?", (otp_id,))
+
+
 # --- тарифы (plans) — раунд 8, модуль 4 (аудит, раздел 12 "Объединить":
 # PLANS из статичного словаря billing.py в таблицу с историей цен) ---
 

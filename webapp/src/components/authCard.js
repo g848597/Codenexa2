@@ -5,10 +5,12 @@
 import { authApi, setToken, isRunningInsideTelegram } from '../api/authApi.js';
 import { haptic, openExternalLink } from '../telegram.js';
 
-let mode = 'login'; // 'login' | 'register'
+let mode = 'login'; // 'login' | 'register' | 'forgot' | 'reset'
 let busy = false;
 let errorMsg = '';
+let successMsg = '';
 let pendingTotp = false; // true, если сервер попросил код 2FA
+let resetEmail = ''; // email, для которого запрошен код сброса пароля (флоу 'forgot' -> 'reset')
 
 function icon(name) {
   const icons = {
@@ -20,30 +22,26 @@ function icon(name) {
   return icons[name] || '';
 }
 
+const TITLES = {
+  login: 'Вход в аккаунт',
+  register: 'Создать аккаунт',
+  forgot: 'Восстановление пароля',
+  reset: 'Новый пароль',
+};
+
+const DESCS = {
+  login: 'Один аккаунт для всех продуктов CodeNexa — данные и подписка синхронизируются между устройствами.',
+  register: 'Один аккаунт для всех продуктов CodeNexa — данные и подписка синхронизируются между устройствами.',
+  forgot: 'Укажите email, привязанный к аккаунту — пришлём код для сброса пароля.',
+  reset: `Мы отправили 6-значный код на ${resetEmail || 'ваш email'}. Введите его вместе с новым паролем.`,
+};
+
 function render(root, onAuthed) {
-  root.innerHTML = `
-  <div class="auth-overlay">
-    <div class="auth-card">
-      <div class="auth-brand">
-        <div class="auth-brand-mark">CN</div>
-        <div class="auth-brand-name">CodeNexa</div>
-      </div>
-      <div class="auth-eyebrow">Личный кабинет</div>
-      <div class="auth-title">${mode === 'login' ? 'Вход в аккаунт' : 'Создать аккаунт'}</div>
-      <div class="auth-desc">Один аккаунт для всех продуктов CodeNexa — данные и подписка синхронизируются между устройствами.</div>
+  const isCredentialsMode = mode === 'login' || mode === 'register';
+  const isRecoveryMode = mode === 'forgot' || mode === 'reset';
 
-      ${isRunningInsideTelegram() ? `
-      <button class="auth-btn auth-btn-telegram" data-auth-telegram>
-        ${icon('telegram')} <span>Продолжить с Telegram</span>
-      </button>
-      ` : ''}
-      <div class="auth-oauth-row">
-        <button class="auth-btn auth-btn-oauth" data-auth-google>${icon('google')} <span>Google</span></button>
-        <button class="auth-btn auth-btn-oauth" data-auth-yandex>${icon('yandex')} <span>Яндекс</span></button>
-      </div>
-      <div class="auth-divider"><span>или email</span></div>
-
-      <form class="auth-form" data-auth-form>
+  const formFields = isCredentialsMode
+    ? `
         <label class="auth-field">
           <span>Email</span>
           <input type="email" name="email" required autocomplete="email" placeholder="you@example.com" />
@@ -62,18 +60,67 @@ function render(root, onAuthed) {
           <span>Код из приложения-аутентификатора</span>
           <input type="text" name="totpCode" inputmode="numeric" pattern="[0-9]*" placeholder="123456" />
         </label>` : ''}
+        ${mode === 'login' ? `<button type="button" class="auth-link-btn" data-auth-forgot>Забыли пароль?</button>` : ''}`
+    : mode === 'forgot'
+      ? `
+        <label class="auth-field">
+          <span>Email</span>
+          <input type="email" name="email" required autocomplete="email" placeholder="you@example.com" />
+        </label>`
+      : `
+        <label class="auth-field">
+          <span>Код из письма</span>
+          <input type="text" name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" required autocomplete="one-time-code" placeholder="123456" />
+        </label>
+        <label class="auth-field">
+          <span>Новый пароль</span>
+          <input type="password" name="newPassword" required autocomplete="new-password" minlength="8" placeholder="Минимум 8 символов" />
+        </label>`;
+
+  const submitLabel = busy
+    ? 'Секунду…'
+    : { login: 'Войти', register: 'Зарегистрироваться', forgot: 'Отправить код', reset: 'Сбросить пароль' }[mode];
+
+  root.innerHTML = `
+  <div class="auth-overlay">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="auth-brand-mark">CN</div>
+        <div class="auth-brand-name">CodeNexa</div>
+      </div>
+      <div class="auth-eyebrow">Личный кабинет</div>
+      <div class="auth-title">${TITLES[mode]}</div>
+      <div class="auth-desc">${DESCS[mode]}</div>
+
+      ${isCredentialsMode && isRunningInsideTelegram() ? `
+      <button class="auth-btn auth-btn-telegram" data-auth-telegram>
+        ${icon('telegram')} <span>Продолжить с Telegram</span>
+      </button>
+      ` : ''}
+      ${isCredentialsMode ? `
+      <div class="auth-oauth-row">
+        <button class="auth-btn auth-btn-oauth" data-auth-google>${icon('google')} <span>Google</span></button>
+        <button class="auth-btn auth-btn-oauth" data-auth-yandex>${icon('yandex')} <span>Яндекс</span></button>
+      </div>
+      <div class="auth-divider"><span>или email</span></div>` : ''}
+
+      <form class="auth-form" data-auth-form>
+        ${formFields}
 
         ${errorMsg ? `<div class="auth-error">${errorMsg}</div>` : ''}
+        ${successMsg ? `<div class="auth-success">${successMsg}</div>` : ''}
 
         <button type="submit" class="auth-btn auth-btn-primary" ${busy ? 'disabled' : ''}>
-          ${busy ? 'Секунду…' : (mode === 'login' ? 'Войти' : 'Зарегистрироваться')}
+          ${submitLabel}
         </button>
       </form>
 
       <div class="auth-switch">
         ${mode === 'login'
           ? `Нет аккаунта? <button data-auth-switch>Зарегистрироваться</button>`
-          : `Уже есть аккаунт? <button data-auth-switch>Войти</button>`}
+          : mode === 'register'
+            ? `Уже есть аккаунт? <button data-auth-switch>Войти</button>`
+            : `<button data-auth-switch>← Вернуться ко входу</button>`}
       </div>
 
       <div class="auth-legal">Продолжая, вы соглашаетесь с условиями использования и политикой конфиденциальности CodeNexa.</div>
@@ -106,26 +153,55 @@ function render(root, onAuthed) {
   const yandexBtn = root.querySelector('[data-auth-yandex]');
   if (yandexBtn) yandexBtn.addEventListener('click', () => { openExternalLink(authApi.yandexStartUrl()); });
 
+  const forgotBtn = root.querySelector('[data-auth-forgot]');
+  if (forgotBtn) {
+    forgotBtn.addEventListener('click', () => {
+      mode = 'forgot'; errorMsg = ''; successMsg = ''; pendingTotp = false;
+      render(root, onAuthed);
+    });
+  }
+
   root.querySelector('[data-auth-switch]').addEventListener('click', () => {
-    mode = mode === 'login' ? 'register' : 'login';
-    errorMsg = ''; pendingTotp = false;
+    mode = isRecoveryMode ? 'login' : (mode === 'login' ? 'register' : 'login');
+    errorMsg = ''; successMsg = ''; pendingTotp = false; resetEmail = '';
     render(root, onAuthed);
   });
 
   root.querySelector('[data-auth-form]').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const fd = new FormData(ev.target);
-    const email = fd.get('email');
-    const password = fd.get('password');
-    const firstName = fd.get('firstName');
-    const totpCode = fd.get('totpCode');
 
-    busy = true; errorMsg = ''; render(root, onAuthed);
+    busy = true; errorMsg = ''; successMsg = ''; render(root, onAuthed);
     try {
-      const result = mode === 'login'
-        ? await authApi.login(email, password, totpCode || undefined)
-        : await authApi.register(email, password, firstName || undefined);
-      finish(result);
+      if (mode === 'login' || mode === 'register') {
+        const email = fd.get('email');
+        const password = fd.get('password');
+        const firstName = fd.get('firstName');
+        const totpCode = fd.get('totpCode');
+        const result = mode === 'login'
+          ? await authApi.login(email, password, totpCode || undefined)
+          : await authApi.register(email, password, firstName || undefined);
+        finish(result);
+        return;
+      }
+      if (mode === 'forgot') {
+        const email = fd.get('email');
+        await authApi.forgotPassword(email);
+        resetEmail = email;
+        mode = 'reset';
+        busy = false;
+        render(root, onAuthed);
+        return;
+      }
+      // mode === 'reset'
+      const code = fd.get('code');
+      const newPassword = fd.get('newPassword');
+      await authApi.resetPassword(resetEmail, code, newPassword);
+      mode = 'login';
+      busy = false;
+      successMsg = 'Пароль обновлён — теперь можно войти с новым паролем.';
+      resetEmail = '';
+      render(root, onAuthed);
     } catch (e) {
       busy = false;
       if (e.status === 401 && /2FA/.test(e.message)) {
@@ -140,6 +216,6 @@ function render(root, onAuthed) {
 }
 
 export function mountAuthCard(root, onAuthed) {
-  mode = 'login'; busy = false; errorMsg = ''; pendingTotp = false;
+  mode = 'login'; busy = false; errorMsg = ''; successMsg = ''; pendingTotp = false; resetEmail = '';
   render(root, onAuthed);
 }

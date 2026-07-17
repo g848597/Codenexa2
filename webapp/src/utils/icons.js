@@ -60,6 +60,11 @@ const PATHS = {
   flame: '<path d="M12 3s-4.5 4-4.5 8.2A4.5 4.5 0 0 0 12 21a4.5 4.5 0 0 0 4.5-9.8c-.4 1.4-1.3 2.3-2.2 2.3.6-2.6-.4-5-1.8-6.7-.2 1.5-.9 2.6-1.7 3.2-.3-1.6-.9-3.2 1.2-7z" stroke-linejoin="round"/>',
   pieChart: '<path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5H12z" stroke-linejoin="round"/><path d="M15.5 3.9A8.5 8.5 0 0 1 20.1 8.5H12z" stroke-linejoin="round"/>',
   diamond: '<path d="M5 9 12 3l7 6-7 12z" stroke-linejoin="round"/><path d="M5 9h14M9 9l3 12 3-12" />',
+
+  // инвесторы: премиальный редизайн
+  chevronRight: '<polyline points="9.5 5 16 12 9.5 19"/>',
+  sliders: '<line x1="4" y1="6" x2="7.2" y2="6"/><circle cx="9.3" cy="6" r="2.1"/><line x1="11.4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="13" y2="12"/><circle cx="15.1" cy="12" r="2.1"/><line x1="17.2" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="9.2" y2="18"/><circle cx="11.3" cy="18" r="2.1"/><line x1="13.4" y1="18" x2="20" y2="18"/>',
+  externalLink: '<path d="M9.5 5.5H5.8A1.3 1.3 0 0 0 4.5 6.8v11.4a1.3 1.3 0 0 0 1.3 1.3h11.4a1.3 1.3 0 0 0 1.3-1.3V14.5"/><path d="M13.5 3.5H20.5V10.5"/><line x1="11" y1="13" x2="20.2" y2="3.8"/>',
 };
 
 /**

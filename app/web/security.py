@@ -1,4 +1,5 @@
 """Пароли, сессии (JWT) и 2FA (TOTP) — всё, что касается безопасности аккаунта."""
+import secrets
 import time
 import uuid
 
@@ -60,3 +61,26 @@ def verify_totp(secret: str, code: str) -> bool:
     if not secret or not code:
         return False
     return pyotp.TOTP(secret).verify(code, valid_window=1)
+
+
+# --- OTP-коды на email: подтверждение адреса и сброс пароля (задача 3,
+# CODENEXA_TASKLIST.md). secrets.randbelow (а не random.randint) — это
+# криптографически стойкий генератор, важно для кода, который защищает смену
+# пароля/подтверждение аккаунта. Код хранится в БД только хешем через тот же
+# bcrypt-контекст, что и пароли (см. hash_password/verify_password выше) —
+# отдельный контекст здесь не нужен, входные данные симметричны (короткая
+# строка), поэтому переиспользуем существующий, а не заводим новый.
+
+def generate_otp_code() -> str:
+    """6-значный цифровой код, всегда с ведущими нулями (например '004213') —
+    длина фиксирована, поэтому в письме и на экране ввода код выглядит
+    единообразно."""
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def hash_otp_code(code: str) -> str:
+    return pwd_context.hash(code)
+
+
+def verify_otp_code(code: str, hashed: str) -> bool:
+    return verify_password(code, hashed)

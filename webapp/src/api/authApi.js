@@ -93,6 +93,17 @@ export const authApi = {
       body: { currentPassword, newPassword },
     }),
 
+  // Подтверждение email и сброс пароля по одноразовому 6-значному коду,
+  // присылаемому на почту (см. app/web/api/auth.py, задача 3).
+  requestEmailVerification: () => request('/api/auth/verify-email/request', { method: 'POST' }),
+  confirmEmailVerification: (code) =>
+    request('/api/auth/verify-email/confirm', { method: 'POST', body: { code } }),
+
+  forgotPassword: (email) =>
+    request('/api/auth/password/forgot', { method: 'POST', body: { email } }),
+  resetPassword: (email, code, newPassword) =>
+    request('/api/auth/password/reset', { method: 'POST', body: { email, code, newPassword } }),
+
   sessions: () => request('/api/auth/sessions'),
   revokeSession: (id) => request(`/api/auth/sessions/${id}/revoke`, { method: 'POST' }),
   revokeAllSessions: () => request('/api/auth/sessions/revoke-all', { method: 'POST' }),

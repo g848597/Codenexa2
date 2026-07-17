@@ -17,6 +17,42 @@ export function securitySectionHTML(user, state) {
     ? `<div class="hub-notice ${state.notices.security.ok ? 'ok' : 'err'}">${esc(state.notices.security.text)}</div>`
     : '';
 
+  const emailNotice = state.notices.emailVerify
+    ? `<div class="hub-notice ${state.notices.emailVerify.ok ? 'ok' : 'err'}">${esc(state.notices.emailVerify.text)}</div>`
+    : '';
+
+  let emailBlock = '';
+  if (user.email) {
+    if (user.emailVerified) {
+      emailBlock = `
+      <div class="acc-subblock">
+        <div class="acc-subtitle">${t('hub_sec_email_title')}</div>
+        ${emailNotice}
+        <p class="acc-muted">${methodBadge(true, user.email)} — ${t('hub_sec_email_verified')}</p>
+      </div>`;
+    } else if (state.emailVerifyFlow) {
+      emailBlock = `
+      <div class="acc-subblock">
+        <div class="acc-subtitle">${t('hub_sec_email_title')}</div>
+        ${emailNotice}
+        <p class="acc-muted">${t('hub_sec_email_code_sent', esc(user.email))}</p>
+        <form class="acc-form" data-acc-email-confirm-form>
+          <label class="acc-field"><span>${t('hub_sec_email_code_label')}</span><input type="text" name="code" inputmode="numeric" maxlength="6" placeholder="123456" required /></label>
+          <button class="acc-btn acc-btn-small" ${state.busy.emailVerify ? 'disabled' : ''}>${t('hub_sec_email_confirm_btn')}</button>
+        </form>
+        <button class="acc-link-btn" data-acc-email-resend ${state.busy.emailVerify ? 'disabled' : ''}>${t('hub_sec_email_resend_btn')}</button>
+      </div>`;
+    } else {
+      emailBlock = `
+      <div class="acc-subblock">
+        <div class="acc-subtitle">${t('hub_sec_email_title')}</div>
+        ${emailNotice}
+        <p class="acc-muted">${methodBadge(false, user.email)} — ${t('hub_sec_email_not_verified')}</p>
+        <button class="acc-btn acc-btn-small" data-acc-email-request ${state.busy.emailVerify ? 'disabled' : ''}>${t('hub_sec_email_verify_btn')}</button>
+      </div>`;
+    }
+  }
+
   const passwordForm = `
     <form class="acc-form" data-acc-password-form>
       ${
@@ -72,6 +108,7 @@ export function securitySectionHTML(user, state) {
     ${methodBadge(user.hasYandex, t('hub_sec_yandex'))}
     ${methodBadge(user.hasPassword, t('hub_sec_password'))}
   </div>
+  ${emailBlock}
   <div class="acc-subblock">
     <div class="acc-subtitle">${user.hasPassword ? t('hub_sec_password') : t('hub_sec_set_password_title')}</div>
     ${passwordForm}
@@ -88,6 +125,47 @@ export function securitySectionHTML(user, state) {
 }
 
 export function bindSecuritySection(root, { state, render, loadAll }) {
+  const requestEmailBtn = root.querySelector('[data-acc-email-request]');
+  const resendEmailBtn = root.querySelector('[data-acc-email-resend]');
+  const doRequestEmailCode = async () => {
+    state.busy.emailVerify = true;
+    render();
+    try {
+      const res = await authApi.requestEmailVerification();
+      state.emailVerifyFlow = true;
+      if (res && res.alreadyVerified) {
+        state.notices.emailVerify = { ok: true, text: t('hub_sec_email_verified') };
+        await loadAll();
+      }
+    } catch (e) {
+      state.notices.emailVerify = { ok: false, text: e.message };
+    }
+    state.busy.emailVerify = false;
+    render();
+  };
+  if (requestEmailBtn) requestEmailBtn.addEventListener('click', doRequestEmailCode);
+  if (resendEmailBtn) resendEmailBtn.addEventListener('click', doRequestEmailCode);
+
+  const confirmEmailForm = root.querySelector('[data-acc-email-confirm-form]');
+  if (confirmEmailForm)
+    confirmEmailForm.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const code = new FormData(ev.target).get('code');
+      state.busy.emailVerify = true;
+      render();
+      try {
+        await authApi.confirmEmailVerification(code);
+        state.emailVerifyFlow = false;
+        state.notices.emailVerify = { ok: true, text: t('hub_sec_email_confirmed_notice') };
+        haptic('medium');
+        await loadAll();
+      } catch (e) {
+        state.notices.emailVerify = { ok: false, text: e.message };
+      }
+      state.busy.emailVerify = false;
+      render();
+    });
+
   const passForm = root.querySelector('[data-acc-password-form]');
   if (passForm)
     passForm.addEventListener('submit', async (ev) => {

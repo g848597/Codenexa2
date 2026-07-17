@@ -235,6 +235,12 @@ CREATE TABLE IF NOT EXISTS users (
     telegram_id BIGINT UNIQUE,
     email TEXT UNIQUE,
     password_hash TEXT,
+    -- Задача 3 (CODENEXA_TASKLIST.md, раздел A): email подтверждается кодом
+    -- (см. auth_otp_codes ниже, purpose='verify_email'). Для пользователей,
+    -- вошедших только через Telegram/OAuth без email, это поле не имеет
+    -- значения (email может быть NULL) — проверка подтверждения делается
+    -- только там, где это осмысленно (сам email/пароль флоу).
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     google_id TEXT UNIQUE,
     yandex_id TEXT UNIQUE,
     first_name TEXT,
@@ -385,6 +391,27 @@ CREATE TABLE IF NOT EXISTS referrals (
 -- Один пользователь может быть приглашён только один раз.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_referrals_referred ON referrals(referred_id);
 CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id);
+
+-- Задача 3 (CODENEXA_TASKLIST.md): одноразовые OTP-коды для подтверждения
+-- email и сброса пароля. Один код на пользователя+purpose одновременно —
+-- запрос нового кода "гасит" предыдущий (см. repo.create_otp_code). Код
+-- хранится хешем (тем же bcrypt-контекстом, что и пароли — см. security.py),
+-- а не в открытом виде: утечка БД не должна давать возможность подтвердить
+-- чужой email или сбросить чужой пароль. attempts — счётчик неверных
+-- попыток на ЭТОТ конкретный код (защита от перебора 6-значного кода в
+-- пределах его TTL, отдельно от общего rate-limit на сам эндпоинт).
+CREATE TABLE IF NOT EXISTS auth_otp_codes (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose TEXT NOT NULL CHECK (purpose IN ('verify_email', 'reset_password')),
+    code_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    consumed BOOLEAN NOT NULL DEFAULT FALSE,
+    attempts INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_otp_active ON auth_otp_codes(user_id, purpose, consumed);
 """
 
 
@@ -394,6 +421,7 @@ _COLUMN_MIGRATIONS = (
     ("investors", "investment_amount_value", "DOUBLE PRECISION"),
     ("investors", "currency", "TEXT"),
     ("payments", "idempotency_key", "TEXT"),
+    ("users", "email_verified", "BOOLEAN NOT NULL DEFAULT FALSE"),
 )
 
 
