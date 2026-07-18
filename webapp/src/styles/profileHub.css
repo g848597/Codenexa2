@@ -202,3 +202,28 @@
 .hub-notice.ok { background: var(--ledger-dim); color: var(--ledger); }
 .hub-notice.err { background: var(--danger-dim); color: var(--danger-text); }
 .hub-empty-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; }
+
+/* --- Организация (общий аккаунт компании) --- */
+.hub-org-card { border-radius: var(--radius-lg); border: var(--border-glass); background: var(--bg-card); padding: 18px; }
+.hub-org-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.hub-org-name { font-family: var(--font-display); font-size: 17px; font-weight: 600; }
+.hub-org-role-badge { font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 10px; font-family: var(--font-mono); text-transform: uppercase; }
+.hub-org-role-badge.owner { background: var(--gradient-ledger); color: var(--on-ledger); }
+.hub-org-role-badge.member { background: var(--bg-elevated); color: var(--text-dim); border: 1px solid var(--line-strong); }
+.hub-org-owner-line { font-size: 12px; color: var(--text-faint); margin-top: 8px; }
+.hub-org-owner-line b { color: var(--text-dim); font-weight: 600; }
+
+.hub-org-members { margin-top: 16px; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--bg-elevated); overflow: hidden; }
+.hub-org-member-row { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-bottom: 1px solid var(--line); }
+.hub-org-member-row:last-child { border-bottom: none; }
+.hub-org-member-name { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-org-member-you { font-size: 10px; color: var(--text-faint); font-family: var(--font-mono); margin-left: 6px; }
+.hub-org-member-role { flex: none; font-size: 10px; color: var(--text-faint); text-transform: uppercase; font-family: var(--font-mono); }
+.hub-org-remove-btn { flex: none; font-size: 11px; font-weight: 600; color: var(--danger-text); background: none; border: none; cursor: pointer; padding: 4px 6px; }
+
+.hub-org-invite-btn { margin-top: 14px; width: 100%; padding: 12px; border-radius: var(--radius-sm); font-weight: 700; font-size: 13px; cursor: pointer; border: 1px solid var(--line-strong); background: rgba(255,255,255,.04); color: var(--text); }
+.hub-org-leave-btn { margin-top: 10px; width: 100%; padding: 11px; border-radius: var(--radius-sm); font-weight: 600; font-size: 12.5px; cursor: pointer; border: 1px solid var(--danger-text); background: none; color: var(--danger-text); }
+
+.hub-org-create-form { margin-top: 14px; display: flex; gap: 8px; }
+.hub-org-create-input { flex: 1; min-width: 0; font-size: 13px; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong); background: var(--bg-elevated); color: var(--text); }
+.hub-org-create-submit { flex: none; padding: 10px 16px; border-radius: var(--radius-sm); border: none; background: var(--gradient-ledger); color: var(--on-ledger); font-weight: 700; font-size: 12.5px; cursor: pointer; box-shadow: var(--glow-ledger); }

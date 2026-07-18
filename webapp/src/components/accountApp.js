@@ -28,6 +28,7 @@ import { securitySectionHTML, bindSecuritySection } from './profile/securitySect
 import { settingsSectionHTML, bindSettingsSection } from './profile/settingsSection.js';
 import { supportSectionHTML, bindSupportSection } from './profile/supportSection.js';
 import { ecosystemBannerHTML } from './profile/ecosystemBanner.js';
+import { organizationSectionHTML, bindOrganizationSection } from './profile/organizationSection.js';
 import { openProductView } from './productDetail.js';
 
 let root = null;
@@ -48,6 +49,8 @@ function freshState() {
     billing: null,
     referral: null, // { referralCode, confirmedCount, pendingCount } — см. api/authApi.js referralStats()
     totpFlow: null, // { secret, otpauthUrl } во время включения 2FA, пока не подтверждено кодом
+    org: { loading: true, error: null, data: null }, // { organization, members } | null — см. api/authApi.js myOrganization()
+    orgUi: { busy: {}, notice: null, inviteLink: null },
     busy: {}, // busy['password'] / busy['2fa'] / busy['checkout:pro_monthly:stars'] и т.д.
     notices: {}, // короткие сообщения об успехе/ошибке рядом с конкретным блоком
   };
@@ -55,22 +58,43 @@ function freshState() {
 
 let state = freshState();
 
+async function fetchOrgState() {
+  try {
+    const data = await authApi.myOrganization();
+    return { loading: false, error: null, data };
+  } catch (e) {
+    return { loading: false, error: e.message || 'Не удалось загрузить организацию', data: null };
+  }
+}
+
+// Лёгкий пере-запрос только организации (после создания/выхода/удаления
+// сотрудника) — не дёргает остальные API аккаунта заново.
+async function reloadOrg() {
+  state.org = { loading: true, error: null, data: state.org.data };
+  render();
+  state.org = await fetchOrgState();
+  state.orgUi.inviteLink = null;
+  render();
+}
+
 async function loadAll() {
   state.loading = true;
   render();
   try {
-    const [meRes, sessionsRes, plansRes, billingRes, referralRes] = await Promise.all([
+    const [meRes, sessionsRes, plansRes, billingRes, referralRes, orgRes] = await Promise.all([
       authApi.me(),
       authApi.sessions().catch(() => ({ sessions: [] })),
       authApi.plans().catch(() => ({ plans: [], cryptoAssets: [] })),
       authApi.billingStatus().catch(() => ({ payments: [], hasPaid: false })),
       authApi.referralStats().catch(() => null),
+      fetchOrgState(),
     ]);
     user = meRes.user;
     state.sessions = sessionsRes.sessions;
     state.plans = plansRes;
     state.billing = billingRes;
     state.referral = referralRes;
+    state.org = orgRes;
     state.error = null;
   } catch (e) {
     state.error = e.message || 'Не удалось загрузить аккаунт';
@@ -116,6 +140,11 @@ function render() {
     <div class="hub-section" id="hub-subscription">
       ${sectionHead('crown', 'hub_section_subscription')}
       ${subscriptionCardHTML(state.billing, state.plans)}
+    </div>
+
+    <div class="hub-section" id="hub-organization">
+      ${sectionHead('briefcase', 'hub_section_organization')}
+      ${organizationSectionHTML(state, user.id, state.billing)}
     </div>
 
     <div class="hub-section" id="hub-activity">
@@ -175,6 +204,7 @@ function bind() {
   bindEcosystemGrid(root, render);
   bindAiInsights(root, (productId) => openProductView(productId));
   bindSubscriptionCard(root, 'hub-payments');
+  bindOrganizationSection(root, { state, render, reloadOrg, showViewPlans: () => document.getElementById('hub-subscription')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) });
   bindReferralSection(root);
   bindSecuritySection(root, { state, render, loadAll });
   bindSettingsSection(root, {

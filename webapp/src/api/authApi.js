@@ -132,6 +132,14 @@ export const authApi = {
       body: { plan, method, network },
       extraHeaders: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {},
     }),
+
+  // --- Организация (общий аккаунт компании, см. profile/organizationSection.js) ---
+  myOrganization: () => request('/api/organizations/me'),
+  createOrganization: (name) => request('/api/organizations', { method: 'POST', body: { name } }),
+  inviteOrgMember: (email) => request('/api/organizations/invite', { method: 'POST', body: { email: email || null } }),
+  acceptOrgInvite: (token) => request(`/api/organizations/invite/${encodeURIComponent(token)}/accept`, { method: 'POST' }),
+  removeOrgMember: (userId) => request(`/api/organizations/members/${userId}`, { method: 'DELETE' }),
+  leaveOrganization: () => request('/api/organizations/leave', { method: 'POST' }),
 };
 
 export function isRunningInsideTelegram() {

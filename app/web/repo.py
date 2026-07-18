@@ -742,3 +742,193 @@ def count_confirmed_referrals(referrer_id: int) -> int:
         (referrer_id,),
     )
     return row["n"] if row else 0
+
+
+# --- организации (командный/бизнес-тариф) и документы (раздел "Документы") ---
+
+def create_organization(name: str, owner_user_id: int, plan_code: str):
+    with tx() as conn:
+        cur = conn.execute(
+            "INSERT INTO organizations (name, owner_user_id, plan_code) VALUES (?, ?, ?)",
+            (name, owner_user_id, plan_code),
+        )
+        org = row_to_dict(conn.execute(
+            "SELECT * FROM organizations WHERE id = ?", (cur.lastrowid,)
+        ).fetchone())
+        conn.execute(
+            "INSERT INTO organization_members (org_id, user_id, role) VALUES (?, ?, 'owner')",
+            (org["id"], owner_user_id),
+        )
+        return org
+
+
+def get_organization(org_id: int):
+    return _fetch_one("SELECT * FROM organizations WHERE id = ?", (org_id,))
+
+
+def get_user_membership(user_id: int):
+    """Организация и роль текущего пользователя, если он в неё входит —
+    None, если пользователь не состоит ни в одной организации."""
+    return _fetch_one(
+        "SELECT organization_members.*, organizations.name AS org_name, "
+        "organizations.plan_code AS org_plan_code FROM organization_members "
+        "JOIN organizations ON organizations.id = organization_members.org_id "
+        "WHERE organization_members.user_id = ?",
+        (user_id,),
+    )
+
+
+def list_organization_members(org_id: int):
+    return _fetch_all(
+        "SELECT organization_members.*, users.first_name, users.last_name, users.email "
+        "FROM organization_members JOIN users ON users.id = organization_members.user_id "
+        "WHERE organization_members.org_id = ? ORDER BY organization_members.created_at ASC",
+        (org_id,),
+    )
+
+
+def remove_organization_member(org_id: int, user_id: int):
+    with tx() as conn:
+        conn.execute(
+            "DELETE FROM organization_members WHERE org_id = ? AND user_id = ? AND role != 'owner'",
+            (org_id, user_id),
+        )
+
+
+def create_organization_invite(org_id: int, token: str, email: str | None, role: str = "member"):
+    with tx() as conn:
+        cur = conn.execute(
+            "INSERT INTO organization_invites (org_id, token, email, role) VALUES (?, ?, ?, ?)",
+            (org_id, token, email, role),
+        )
+        return row_to_dict(conn.execute(
+            "SELECT * FROM organization_invites WHERE id = ?", (cur.lastrowid,)
+        ).fetchone())
+
+
+def get_invite_by_token(token: str):
+    return _fetch_one(
+        "SELECT * FROM organization_invites WHERE token = ? AND status = 'pending'", (token,)
+    )
+
+
+def accept_organization_invite(token: str, user_id: int):
+    """Помечает приглашение принятым и добавляет пользователя в организацию.
+    Возвращает None, если приглашения нет / уже использовано, или если
+    пользователь уже состоит в какой-то другой организации (упрощение:
+    один пользователь = одна организация, см. idx_org_members_user)."""
+    with tx() as conn:
+        invite = conn.execute(
+            "SELECT * FROM organization_invites WHERE token = ? AND status = 'pending'", (token,)
+        ).fetchone()
+        if not invite:
+            return None
+        already = conn.execute(
+            "SELECT 1 FROM organization_members WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if already:
+            return None
+        conn.execute(
+            "INSERT INTO organization_members (org_id, user_id, role) VALUES (?, ?, ?)",
+            (invite["org_id"], user_id, invite["role"]),
+        )
+        conn.execute(
+            "UPDATE organization_invites SET status = 'accepted', accepted_at = NOW() WHERE id = ?",
+            (invite["id"],),
+        )
+        return row_to_dict(invite)
+
+
+# --- шаблоны документов ---
+
+def list_templates_for_scope(org_id: int | None):
+    """Системные шаблоны (owner_org_id IS NULL) + приватные шаблоны
+    организации пользователя, если он в ней состоит."""
+    if org_id:
+        return _fetch_all(
+            "SELECT * FROM document_templates WHERE is_active AND "
+            "(owner_org_id IS NULL OR owner_org_id = ?) ORDER BY category ASC, title ASC",
+            (org_id,),
+        )
+    return _fetch_all(
+        "SELECT * FROM document_templates WHERE is_active AND owner_org_id IS NULL "
+        "ORDER BY category ASC, title ASC"
+    )
+
+
+def get_template_for_scope(code: str, org_id: int | None):
+    """Ищет сначала приватный шаблон организации пользователя (если есть),
+    иначе системный — так организация может переопределить system-код своим
+    под тем же code, не ломая ссылки для остальных."""
+    if org_id:
+        own = _fetch_one(
+            "SELECT * FROM document_templates WHERE code = ? AND owner_org_id = ? AND is_active",
+            (code, org_id),
+        )
+        if own:
+            return own
+    return _fetch_one(
+        "SELECT * FROM document_templates WHERE code = ? AND owner_org_id IS NULL AND is_active",
+        (code,),
+    )
+
+
+def create_template(owner_org_id: int | None, code: str, category: str, title: str,
+                     description: str, fields: list, body_template: str, locked: bool = False):
+    with tx() as conn:
+        cur = conn.execute(
+            "INSERT INTO document_templates "
+            "(code, owner_org_id, category, title, description, fields, body_template, locked) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (code, owner_org_id, category, title, description,
+             psycopg2.extras.Json(fields), body_template, locked),
+        )
+        return row_to_dict(conn.execute(
+            "SELECT * FROM document_templates WHERE id = ?", (cur.lastrowid,)
+        ).fetchone())
+
+
+def deactivate_template(owner_org_id: int, code: str):
+    """Организация может выключить только свой собственный шаблон —
+    поэтому owner_org_id обязателен и не может быть NULL (системные
+    шаблоны редактируются отдельно, через админку)."""
+    with tx() as conn:
+        conn.execute(
+            "UPDATE document_templates SET is_active = FALSE "
+            "WHERE code = ? AND owner_org_id = ?",
+            (code, owner_org_id),
+        )
+
+
+# --- документы пользователей ---
+
+def create_document(user_id: int, org_id: int | None, template_code: str | None,
+                     title: str, data: dict, final_text: str):
+    with tx() as conn:
+        cur = conn.execute(
+            "INSERT INTO documents (user_id, org_id, template_code, title, data, final_text) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, org_id, template_code, title, psycopg2.extras.Json(data), final_text),
+        )
+        return row_to_dict(conn.execute(
+            "SELECT * FROM documents WHERE id = ?", (cur.lastrowid,)
+        ).fetchone())
+
+
+def list_documents(user_id: int, page: int = 1, page_size: int = 20):
+    offset = max(page - 1, 0) * page_size
+    return _fetch_all(
+        "SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        (user_id, page_size, offset),
+    )
+
+
+def get_document(doc_id: int, user_id: int):
+    return _fetch_one(
+        "SELECT * FROM documents WHERE id = ? AND user_id = ?", (doc_id, user_id)
+    )
+
+
+def delete_document(doc_id: int, user_id: int):
+    with tx() as conn:
+        conn.execute("DELETE FROM documents WHERE id = ? AND user_id = ?", (doc_id, user_id))

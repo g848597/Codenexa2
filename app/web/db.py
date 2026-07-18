@@ -414,6 +414,82 @@ CREATE TABLE IF NOT EXISTS auth_otp_codes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_auth_otp_active ON auth_otp_codes(user_id, purpose, consumed);
+
+-- Командные (бизнес-тариф) аккаунты. Одна организация = один плательщик
+-- бизнес-тарифа, внутри которого может быть несколько users (сотрудников).
+CREATE TABLE IF NOT EXISTS organizations (
+    id BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    owner_user_id BIGINT NOT NULL REFERENCES users(id),
+    plan_code TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Кто состоит в организации и с какой ролью. Один пользователь не может
+-- состоять в двух организациях одновременно (упрощение для первой версии).
+CREATE TABLE IF NOT EXISTS organization_members (
+    id BIGSERIAL PRIMARY KEY,
+    org_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'member')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_org_members_user ON organization_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_org_members_org ON organization_members(org_id);
+
+-- Приглашения сотрудников в организацию по токену-ссылке.
+CREATE TABLE IF NOT EXISTS organization_invites (
+    id BIGSERIAL PRIMARY KEY,
+    org_id BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    token TEXT NOT NULL UNIQUE,
+    email TEXT,
+    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'member')),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'revoked')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    accepted_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_org_invites_org ON organization_invites(org_id);
+
+-- Шаблоны документов раздела "Документы". owner_org_id = NULL значит
+-- системный шаблон, виден всем; иначе это приватный шаблон организации,
+-- виден только её участникам. fields -- вопросы мастера заполнения (см.
+-- webapp/src/components/docsApp.js renderField/renderWizard -- форма
+-- рендерится по этому массиву без правок кода фронтенда). body_template --
+-- текст документа с плейсхолдерами {{key}}, key совпадает с fields[].key.
+CREATE TABLE IF NOT EXISTS document_templates (
+    id BIGSERIAL PRIMARY KEY,
+    code TEXT NOT NULL,
+    owner_org_id BIGINT REFERENCES organizations(id) ON DELETE CASCADE,
+    category TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    fields JSONB NOT NULL DEFAULT '[]',
+    body_template TEXT NOT NULL,
+    locked BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- code уникален в рамках своей области видимости: не может повториться
+-- дважды среди системных шаблонов, и не может повториться дважды внутри
+-- одной организации -- но разные организации могут использовать общий code.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_templates_code_global
+    ON document_templates(code) WHERE owner_org_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_templates_code_org
+    ON document_templates(owner_org_id, code) WHERE owner_org_id IS NOT NULL;
+
+-- Готовые документы пользователей, собранные по шаблону (или собственный
+-- текст из AI-конструктора -- тогда template_code = NULL).
+CREATE TABLE IF NOT EXISTS documents (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    org_id BIGINT REFERENCES organizations(id),
+    template_code TEXT,
+    title TEXT NOT NULL,
+    data JSONB NOT NULL DEFAULT '{}',
+    final_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id, created_at DESC);
 """
 
 
@@ -516,9 +592,89 @@ def _seed_default_plans(conn):
             )
 
 
+# Дефолтные шаблоны документов раздела "Документы" (см. app/web/api/docs.py) —
+# минимальный стартовый набор, admin/владелец организации может добавлять
+# свои через тот же API (owner_org_id != NULL).
+_DEFAULT_TEMPLATES = (
+    {
+        "code": "rent_agreement",
+        "category": "Аренда",
+        "title": "Договор аренды помещения",
+        "description": "Простой договор аренды между арендодателем и арендатором.",
+        "fields": [
+            {"key": "landlord_name", "question": "ФИО арендодателя", "required": True},
+            {"key": "tenant_name", "question": "ФИО арендатора", "required": True},
+            {"key": "address", "question": "Адрес помещения", "required": True},
+            {"key": "amount", "question": "Сумма аренды в месяц", "required": True, "isMoney": True},
+            {"key": "notes", "question": "Дополнительные условия", "required": False, "multiline": True},
+        ],
+        "body_template": (
+            "ДОГОВОР АРЕНДЫ ПОМЕЩЕНИЯ\n\n"
+            "Арендодатель: {{landlord_name}}\n"
+            "Арендатор: {{tenant_name}}\n"
+            "Адрес помещения: {{address}}\n"
+            "Сумма аренды: {{amount}} в месяц\n\n"
+            "Дополнительные условия: {{notes}}\n"
+        ),
+    },
+    # Самый простой шаблон из всех — минимум полей, без денег и дат,
+    # специально для проверки цикла "открыл мастер -> заполнил ->
+    # предпросмотр -> сохранил -> увидел в списке документов".
+    {
+        "code": "explanatory_note",
+        "category": "Общие",
+        "title": "Объяснительная записка",
+        "description": "Короткая объяснительная на имя руководителя.",
+        "fields": [
+            {"key": "full_name", "question": "Ваше ФИО", "required": True},
+            {"key": "recipient", "question": "Кому адресована (ФИО, должность)", "required": True},
+            {
+                "key": "explanation",
+                "question": "Что произошло и почему",
+                "required": True,
+                "multiline": True,
+            },
+            {"key": "date", "question": "Дата", "required": False},
+        ],
+        "body_template": (
+            "ОБЪЯСНИТЕЛЬНАЯ ЗАПИСКА\n\n"
+            "От: {{full_name}}\n"
+            "Кому: {{recipient}}\n\n"
+            "{{explanation}}\n\n"
+            "Дата: {{date}}\n"
+        ),
+    },
+)
+
+
+def _seed_default_templates(conn):
+    """Проверка по каждому code отдельно (а не "есть ли вообще хоть один
+    системный шаблон") — иначе на уже развёрнутой БД, где 1 затравочный
+    шаблон уже лежит, новые добавленные сюда позже шаблоны никогда бы не
+    докатились при перезапуске."""
+    with conn.cursor() as cur:
+        for t in _DEFAULT_TEMPLATES:
+            cur.execute(
+                "SELECT 1 FROM document_templates WHERE code = %s AND owner_org_id IS NULL",
+                (t["code"],),
+            )
+            if cur.fetchone():
+                continue
+            cur.execute(
+                "INSERT INTO document_templates "
+                "(code, owner_org_id, category, title, description, fields, body_template) "
+                "VALUES (%s, NULL, %s, %s, %s, %s, %s)",
+                (
+                    t["code"], t["category"], t["title"], t["description"],
+                    psycopg2.extras.Json(t["fields"]), t["body_template"],
+                ),
+            )
+
+
 def init_db():
     with _borrow_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(SCHEMA)
         _run_migrations(conn)
         _seed_default_plans(conn)
+        _seed_default_templates(conn)

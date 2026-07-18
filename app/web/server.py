@@ -14,7 +14,7 @@ import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.web.api import admin_plans, admin_users, auth, billing, investors, referrals, sport_routes, telegram_webhook
+from app.web.api import admin_plans, admin_users, auth, billing, docs, investors, organizations, referrals, sport_routes, telegram_webhook
 from app.web.config import settings
 from app.web.db import get_conn, init_db
 from app.web.middleware import SecurityHeadersMiddleware
@@ -58,6 +58,8 @@ app.include_router(investors.router)
 app.include_router(referrals.router)
 app.include_router(telegram_webhook.router)
 app.include_router(sport_routes.router)
+app.include_router(organizations.router)
+app.include_router(docs.router)
 
 
 @app.get("/health")
