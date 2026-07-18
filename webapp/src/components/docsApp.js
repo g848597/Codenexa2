@@ -96,7 +96,6 @@ function render() {
     case 'templates': inner = renderTemplateList(screen.params); break;
     case 'wizard': inner = renderWizard(screen.params); break;
     case 'preview': inner = renderPreview(screen.params); break;
-    case 'ai': inner = renderAi(screen.params); break;
     case 'custom': inner = renderCustom(screen.params); break;
     case 'mydocs': inner = renderMyDocuments(screen.params); break;
     case 'mydoc-detail': inner = renderMyDocumentDetail(screen.params); break;
@@ -215,11 +214,11 @@ function renderHome() {
   <section class="dh-hero dh-fade dh-fade-1">
     <div class="dh-hero-eyebrow">${icon('sparkles')} AI Docs · CodeNexa</div>
     <h1 class="dh-hero-title">Документы <em>за минуту</em>, а не за день</h1>
-    <p class="dh-hero-sub">Готовые шаблоны, AI-конструктор по описанию и произвольные документы — на выходе всегда чистый PDF или DOCX.</p>
+    <p class="dh-hero-sub">Готовые шаблоны по категориям — отвечаете на пару вопросов в чате, а на выходе всегда чистый PDF или DOCX.</p>
     ${renderHeroIllustration()}
     <div class="dh-hero-actions">
       <button class="dh-btn-primary" data-go="categories">${icon('fileText')} Создать документ</button>
-      <button class="dh-btn-secondary" data-go="ai">${icon('bot')} AI-конструктор — опишите своими словами</button>
+      <button class="dh-btn-secondary" data-go="custom">${icon('puzzle')} Свой текст — без шаблона</button>
       <button class="dh-hero-link" data-go="categories">Смотреть все шаблоны ${icon('arrowRight')}</button>
     </div>
   </section>
@@ -232,14 +231,9 @@ function renderHome() {
         <span class="dh-card-title">Создать документ</span>
         <span class="dh-card-hint">По готовому шаблону</span>
       </button>
-      <button class="dh-card" data-go="ai">
-        <span class="dh-card-icon violet">${icon('bot')}</span>
-        <span class="dh-card-title">AI-конструктор</span>
-        <span class="dh-card-hint">Опишите своими словами</span>
-      </button>
       <button class="dh-card" data-go="custom">
         <span class="dh-card-icon steel">${icon('puzzle')}</span>
-        <span class="dh-card-title">Произвольный документ</span>
+        <span class="dh-card-title">Свой текст</span>
         <span class="dh-card-hint">Когда шаблона нет</span>
       </button>
       <button class="dh-card" data-go="mydocs">
@@ -280,8 +274,8 @@ function renderHome() {
     <div class="dh-section-head"><h2>Возможности AI Docs</h2></div>
     <div class="dh-features">
       <div class="dh-feature">${icon('download')} Экспорт в PDF и DOCX</div>
-      <div class="dh-feature">${icon('zap')} Генерация за секунды</div>
-      <div class="dh-feature">${icon('bot')} AI-конструктор по описанию</div>
+      <div class="dh-feature">${icon('zap')} Готовый документ за минуту</div>
+      <div class="dh-feature">${icon('puzzle')} Свой текст, если шаблона нет</div>
       <div class="dh-feature">${icon('user')} Автоподстановка профиля</div>
       <div class="dh-feature">${icon('layers')} Шаблоны для бизнеса и HR</div>
       <div class="dh-feature">${icon('shieldCheck')} История и повтор документов</div>
@@ -292,7 +286,7 @@ function renderHome() {
     <div class="dh-stats">
       <div class="dh-stat"><div class="dh-stat-value">${totalTemplates !== null ? totalTemplates : '—'}</div><div class="dh-stat-label">Шаблонов</div></div>
       <div class="dh-stat"><div class="dh-stat-value">${homeState.docs !== null ? homeState.docsTotal : '—'}</div><div class="dh-stat-label">Ваши документы</div></div>
-      <div class="dh-stat"><div class="dh-stat-value">3</div><div class="dh-stat-label">Тарифа</div></div>
+      <div class="dh-stat"><div class="dh-stat-value">2</div><div class="dh-stat-label">Тарифа</div></div>
     </div>
   </section>`;
 }
@@ -488,77 +482,173 @@ function wireTemplateList() {
 }
 
 // =========================================================================
-// Экран: мастер заполнения полей шаблона
+// Экран: мастер заполнения шаблона — в виде чата (один вопрос за раз)
 // =========================================================================
+//
+// Раньше здесь была одна длинная форма со всеми полями сразу. По запросу
+// (см. чат) переделано в пошаговый диалог: бот задаёт вопрос -> пользователь
+// отвечает -> следующий вопрос, как в мессенджере. Каждый отвеченный вопрос
+// остаётся видимым выше в виде пары реплик и кликабелен для правки ответа.
 
-let wizardState = { template: null, values: {}, error: null, loading: false };
+let wizardState = { template: null, values: {}, step: 0, error: null, loading: false };
 
 function renderWizard(params) {
   if (!wizardState.template || wizardState.template.code !== params.code) {
-    wizardState = { template: null, values: {}, error: null, loading: true };
+    wizardState = { template: null, values: {}, step: 0, error: null, loading: true };
     loadWizardTemplate(params.code);
-    return loadingHTML('Открываю мастер…');
+    return loadingHTML('Открываю чат…');
   }
-  if (wizardState.loading) return loadingHTML('Открываю мастер…');
+  if (wizardState.loading) return loadingHTML('Открываю чат…');
+  if (wizardState.loadError) return errorHTML(wizardState.loadError);
 
   const tpl = wizardState.template;
+  const fields = tpl.fields;
+  const step = wizardState.step;
+  const done = step >= fields.length;
+
+  const history = fields.slice(0, step).map((f, i) => renderAnsweredBubble(f, i)).join('');
+
+  let activeBlock = '';
+  if (!done) {
+    const field = fields[step];
+    activeBlock = `
+    <div class="da-chat-msg da-chat-bot">
+      <div class="da-chat-bubble">
+        <div class="da-chat-progress">Вопрос ${step + 1} из ${fields.length}</div>
+        <div>${esc(field.question)}${field.required ? '' : ' <span class="da-optional">(необязательно)</span>'}</div>
+        ${field.hint ? `<div class="da-chat-hint">${esc(field.hint)}</div>` : ''}
+      </div>
+    </div>`;
+  } else {
+    activeBlock = `
+    <div class="da-chat-msg da-chat-bot">
+      <div class="da-chat-bubble">${icon('checkCircle')} Все вопросы позади — можно смотреть готовый документ.</div>
+    </div>`;
+  }
+
   return `
   <h2 class="da-h2">${esc(tpl.title)}</h2>
-  <p class="da-hint-block">${esc(tpl.description)}</p>
-  ${wizardState.error ? `<div class="da-inline-error">${icon('alertTriangle')} ${esc(wizardState.error)}</div>` : ''}
-  <form class="da-form" data-wizard-form>
-    ${tpl.fields.map((f) => renderField(f, wizardState.values[f.key])).join('')}
-    <button type="submit" class="da-btn-primary" ${wizardState.loading ? 'disabled' : ''}>
-      ${wizardState.loading ? 'Собираю документ…' : 'Продолжить →'}
-    </button>
-  </form>`;
+  <div class="da-chat" data-chat-scroll>
+    ${history}
+    ${activeBlock}
+    ${wizardState.error ? `<div class="da-inline-error">${icon('alertTriangle')} ${esc(wizardState.error)}</div>` : ''}
+  </div>
+  ${done ? `
+    <div class="da-actions da-chat-footer">
+      <button class="da-btn-primary" data-wizard-preview ${wizardState.loading ? 'disabled' : ''}>${wizardState.loading ? 'Собираю…' : `${icon('fileText')} Показать документ`}</button>
+    </div>
+  ` : renderWizardInput(fields[step])}
+  `;
 }
 
-function renderField(field, prevValue) {
-  const value = prevValue !== undefined ? prevValue : (field.prefill || '');
-  const label = `${esc(field.question)}${field.required ? '' : ' <span class="da-optional">(необязательно)</span>'}`;
-  const input = field.multiline
-    ? `<textarea name="${esc(field.key)}" rows="4" ${field.required ? 'required' : ''}>${esc(value)}</textarea>`
-    : `<input type="text" name="${esc(field.key)}" value="${esc(value)}" ${field.required ? 'required' : ''} inputmode="${field.isMoney ? 'numeric' : 'text'}">`;
+function renderAnsweredBubble(field, index) {
+  const value = wizardState.values[field.key];
+  const shown = (value && String(value).trim()) ? esc(value) : '<span class="da-optional">пропущено</span>';
   return `
-  <label class="da-field">
-    <span class="da-field-label">${label}</span>
+  <div class="da-chat-msg da-chat-bot">
+    <div class="da-chat-bubble">${esc(field.question)}</div>
+  </div>
+  <button class="da-chat-msg da-chat-user da-chat-user-edit" data-edit-step="${index}" type="button">
+    <div class="da-chat-bubble">${shown}<span class="da-chat-edit-hint">${icon('fileEdit')} изменить</span></div>
+  </button>`;
+}
+
+function renderWizardInput(field) {
+  const value = wizardState.values[field.key] || field.prefill || '';
+  const input = field.multiline
+    ? `<textarea class="da-chat-textarea" name="answer" rows="3" placeholder="Ваш ответ…">${esc(value)}</textarea>`
+    : `<input class="da-chat-input-el" type="text" name="answer" value="${esc(value)}" placeholder="Ваш ответ…" inputmode="${field.isMoney ? 'numeric' : 'text'}">`;
+  return `
+  <form class="da-chat-input" data-wizard-form>
     ${input}
-    ${field.hint ? `<span class="da-field-hint">${esc(field.hint)}</span>` : ''}
-  </label>`;
+    <button type="submit" class="da-chat-send" aria-label="Отправить">${icon('arrowRight')}</button>
+    ${!field.required ? '<button type="button" class="da-chat-skip" data-wizard-skip>Пропустить</button>' : ''}
+  </form>`;
 }
 
 async function loadWizardTemplate(code) {
   try {
     const tpl = await docsApi.getTemplate(code);
-    wizardState = { template: tpl, values: {}, error: null, loading: false };
+    wizardState = { template: tpl, values: {}, step: 0, error: null, loading: false };
     render();
   } catch (e) {
-    wizardState = { template: null, values: {}, error: null, loading: false };
-    root.querySelector('.da-body').innerHTML = errorHTML(e.message);
-    wireRetry(() => render());
+    wizardState = { template: null, values: {}, step: 0, error: null, loading: false, loadError: e.message };
+    render();
   }
 }
 
-function wireWizard(params) {
-  const form = root.querySelector('[data-wizard-form]');
-  if (!form) return;
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const fd = new FormData(form);
-    const values = {};
-    for (const [k, v] of fd.entries()) values[k] = v;
-    wizardState.values = values;
+function scrollChatToBottom() {
+  const el = root.querySelector('[data-chat-scroll]');
+  if (el) el.scrollTop = el.scrollHeight;
+}
 
+function wireWizard(params) {
+  scrollChatToBottom();
+
+  root.querySelectorAll('[data-edit-step]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      haptic('light');
+      wizardState.step = Number(btn.dataset.editStep);
+      wizardState.error = null;
+      render();
+    });
+  });
+
+  const form = root.querySelector('[data-wizard-form]');
+  if (form) {
+    const input = form.querySelector('.da-chat-input-el, .da-chat-textarea');
+    if (input) input.focus();
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const tpl = wizardState.template;
+      const field = tpl.fields[wizardState.step];
+      const value = new FormData(form).get('answer')?.toString().trim() || '';
+      if (field.required && !value) {
+        wizardState.error = `Поле «${field.question}» обязательно для заполнения`;
+        render();
+        return;
+      }
+      haptic('light');
+      wizardState.values[field.key] = value;
+      wizardState.step += 1;
+      wizardState.error = null;
+      render();
+      scrollChatToBottom();
+    });
+
+    // Enter отправляет ответ (кроме textarea, где Enter — новая строка).
+    if (input && input.tagName === 'INPUT') {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); form.requestSubmit(); }
+      });
+    }
+  }
+
+  const skipBtn = root.querySelector('[data-wizard-skip]');
+  if (skipBtn) skipBtn.addEventListener('click', () => {
+    haptic('light');
+    const tpl = wizardState.template;
+    const field = tpl.fields[wizardState.step];
+    wizardState.values[field.key] = '';
+    wizardState.step += 1;
+    wizardState.error = null;
+    render();
+    scrollChatToBottom();
+  });
+
+  const previewBtn = root.querySelector('[data-wizard-preview]');
+  if (previewBtn) previewBtn.addEventListener('click', async () => {
     haptic('medium');
     wizardState.loading = true;
     render();
     try {
-      const preview = await docsApi.previewDocument(params.code, values);
-      push('preview', { code: params.code, values, finalText: preview.finalText, kind: 'template' });
-    } catch (e2) {
+      const preview = await docsApi.previewDocument(params.code, wizardState.values);
       wizardState.loading = false;
-      wizardState.error = e2.message;
+      push('preview', { code: params.code, values: wizardState.values, finalText: preview.finalText, kind: 'template' });
+    } catch (e) {
+      wizardState.loading = false;
+      wizardState.error = e.message;
       render();
     }
   });
@@ -635,80 +725,7 @@ function wirePreview(params) {
 }
 
 // =========================================================================
-// Экран: AI-конструктор
-// =========================================================================
-
-let aiState = { text: '', loading: false, error: null, result: null };
-
-function renderAi() {
-  return `
-  <h2 class="da-h2">${icon('bot')} AI-конструктор</h2>
-  <p class="da-hint-block">Опишите своими словами, какой документ нужен — AI подберёт шаблон и заполнит, что сможет определить из текста.</p>
-  <form class="da-form" data-ai-form>
-    <textarea name="text" rows="5" placeholder="Например: нужна расписка о получении 300 000 тенге от Иванова с возвратом до 15 августа">${esc(aiState.text)}</textarea>
-    ${aiState.error ? `<div class="da-inline-error">${icon('alertTriangle')} ${esc(aiState.error)}</div>` : ''}
-    <button type="submit" class="da-btn-primary" ${aiState.loading ? 'disabled' : ''}>${aiState.loading ? 'Анализирую…' : 'Определить документ →'}</button>
-  </form>
-  ${aiState.result ? renderAiResult(aiState.result) : ''}`;
-}
-
-function renderAiResult(result) {
-  if (result.templateCode === 'unknown' || !result.templateCode) {
-    return `
-    <div class="da-ai-result">
-      <p>Не удалось точно определить тип документа по описанию.</p>
-      <button class="da-btn-secondary" data-ai-fallback-custom>Сгенерировать как произвольный документ</button>
-      <button class="da-btn-ghost" data-ai-fallback-categories>Выбрать шаблон вручную</button>
-    </div>`;
-  }
-  return `
-  <div class="da-ai-result">
-    <p>Похоже, нужен: <b>${esc(result.templateTitle)}</b> (уверенность ${Math.round((result.confidence || 0) * 100)}%)</p>
-    ${result.missingFields.length ? `<p class="da-hint-block">Осталось уточнить: ${result.missingFields.length} поле(й) — откроется мастер.</p>` : '<p class="da-hint-block">Все обязательные поля уже определены — можно сразу смотреть предпросмотр.</p>'}
-    <button class="da-btn-primary" data-ai-continue>Продолжить →</button>
-  </div>`;
-}
-
-function wireAi() {
-  const form = root.querySelector('[data-ai-form]');
-  if (form) form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const text = new FormData(form).get('text').toString().trim();
-    if (!text) return;
-    aiState = { text, loading: true, error: null, result: null };
-    render();
-    try {
-      const result = await docsApi.aiParse(text);
-      aiState = { text, loading: false, error: null, result };
-      render();
-    } catch (e2) {
-      aiState = { text, loading: false, error: e2.message, result: null };
-      render();
-    }
-  });
-
-  const fallbackCustom = root.querySelector('[data-ai-fallback-custom]');
-  if (fallbackCustom) fallbackCustom.addEventListener('click', () => { haptic('light'); push('custom', { description: aiState.text }); });
-
-  const fallbackCategories = root.querySelector('[data-ai-fallback-categories]');
-  if (fallbackCategories) fallbackCategories.addEventListener('click', () => { haptic('light'); push('categories'); });
-
-  const cont = root.querySelector('[data-ai-continue]');
-  if (cont) cont.addEventListener('click', async () => {
-    haptic('light');
-    const result = aiState.result;
-    try {
-      const tpl = await docsApi.getTemplate(result.templateCode);
-      wizardState = { template: tpl, values: { ...result.extracted }, error: null, loading: false };
-      push('wizard', { code: result.templateCode });
-    } catch (e) {
-      showAlert(e.message);
-    }
-  });
-}
-
-// =========================================================================
-// Экран: произвольный документ
+// Экран: свой текст (без шаблона, без AI — пользователь пишет сам)
 // =========================================================================
 
 let customState = { description: '', loading: false, error: null };
@@ -716,12 +733,12 @@ let customState = { description: '', loading: false, error: null };
 function renderCustom(params) {
   if (params && params.description && !customState.description) customState.description = params.description;
   return `
-  <h2 class="da-h2">${icon('puzzle')} Произвольный документ</h2>
-  <p class="da-hint-block">Опишите, какой документ нужен и что в нём должно быть — AI напишет готовый текст с нуля, без пошагового мастера.</p>
+  <h2 class="da-h2">${icon('puzzle')} Свой текст</h2>
+  <p class="da-hint-block">Если готового шаблона нет — просто напишите текст документа сами. Мы аккуратно оформим его в PDF и DOCX: заголовок, абзацы, место для подписи.</p>
   <form class="da-form" data-custom-form>
-    <textarea name="description" rows="6" placeholder="Например: договор оказания консультационных услуг между ИП и заказчиком, срок 3 месяца, оплата 200 000 тенге ежемесячно">${esc(customState.description)}</textarea>
+    <textarea name="description" rows="10" placeholder="Например:&#10;ДОГОВОР ОКАЗАНИЯ УСЛУГ&#10;&#10;Исполнитель: ...&#10;Заказчик: ...&#10;&#10;1. Предмет договора&#10;...">${esc(customState.description)}</textarea>
     ${customState.error ? `<div class="da-inline-error">${icon('alertTriangle')} ${esc(customState.error)}</div>` : ''}
-    <button type="submit" class="da-btn-primary" ${customState.loading ? 'disabled' : ''}>${customState.loading ? 'Генерирую…' : 'Сгенерировать →'}</button>
+    <button type="submit" class="da-btn-primary" ${customState.loading ? 'disabled' : ''}>${customState.loading ? 'Готовлю…' : 'Предпросмотр →'}</button>
   </form>`;
 }
 
@@ -998,7 +1015,7 @@ function wireProfile() {
 // Экран: Тарифы и оплата
 // =========================================================================
 
-let tariffsState = { plans: null, status: null, loading: false, error: null, checkoutFor: null, checkoutResult: null, checkoutError: null };
+let tariffsState = { plans: null, status: null, limit: null, loading: false, error: null, checkoutFor: null, checkoutResult: null, checkoutError: null };
 
 function renderTariffs() {
   if (!tariffsState.plans && !tariffsState.loading) {
@@ -1008,17 +1025,37 @@ function renderTariffs() {
   if (tariffsState.loading) return loadingHTML('Загружаю тарифы…');
   if (tariffsState.error) return errorHTML(tariffsState.error);
 
-  const { plans, status } = tariffsState;
+  const { plans, status, limit } = tariffsState;
+  const sub = status.subscription;
+  const currentTitle = sub.active ? (plans.find((p) => p.code === sub.plan)?.title || sub.plan) : 'FREE';
+
   return `
   <h2 class="da-h2">${icon('star')} Тарифы</h2>
-  <p class="da-hint-block">Текущий тариф: <b>${esc(status.tariff.toUpperCase())}</b>${status.subscriptionExpiresAt ? ` · до ${new Date(status.subscriptionExpiresAt).toLocaleDateString('ru-RU')}` : ''}. Сегодня создано документов: ${status.todayDocumentCount}${status.isProOrHigher ? '' : ` из ${status.freeDailyLimit}`}.</p>
+  <p class="da-hint-block">
+    Текущий тариф: <b>${esc(currentTitle)}</b>${sub.active && sub.expiresAt ? ` · до ${new Date(sub.expiresAt).toLocaleDateString('ru-RU')}` : ''}.
+    ${limit.isPro ? 'Документы — без ограничений.' : `Сегодня создано документов: ${limit.todayCount} из ${limit.freeDailyLimit}.`}
+  </p>
   <div class="da-plans">
+    <div class="da-plan ${!sub.active ? 'current' : ''}">
+      <div class="da-plan-title">FREE</div>
+      <div class="da-plan-price">Бесплатно</div>
+      <ul class="da-plan-features">
+        <li>До ${limit.freeDailyLimit} документов в день</li>
+        <li>Все бесплатные шаблоны</li>
+        <li>Экспорт в PDF и DOCX</li>
+      </ul>
+    </div>
     ${plans.map((p) => `
-      <div class="da-plan ${status.tariff === p.code ? 'current' : ''}">
+      <div class="da-plan ${sub.active && sub.plan === p.code ? 'current' : ''}">
         <div class="da-plan-title">${esc(p.title)}</div>
-        <div class="da-plan-price">${p.price === 0 ? 'Бесплатно' : `${Number(p.price).toLocaleString('ru-RU')} ₸ / мес`}</div>
-        <ul class="da-plan-features">${p.features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
-        ${p.code === 'free' || status.tariff === p.code ? '' : `<button class="da-btn-primary" data-buy="${p.code}">Оформить</button>`}
+        <div class="da-plan-price">$${p.usd}${p.durationDays ? ` / ${p.durationDays} дн.` : ''}</div>
+        <ul class="da-plan-features">
+          <li>Документы без дневного лимита</li>
+          <li>PRO-шаблоны (договоры, доверенности, КП)</li>
+          <li>Логотип и подпись в документах</li>
+          <li>Тема оформления PDF</li>
+        </ul>
+        ${sub.active && sub.plan === p.code ? '' : `<button class="da-btn-primary" data-buy="${esc(p.code)}">Оформить</button>`}
       </div>`).join('')}
   </div>
   ${tariffsState.checkoutFor ? renderCheckoutPanel() : ''}
@@ -1026,33 +1063,27 @@ function renderTariffs() {
 }
 
 function renderCheckoutPanel() {
-  const plan = tariffsState.checkoutFor;
+  const planCode = tariffsState.checkoutFor;
+  const plan = tariffsState.plans.find((p) => p.code === planCode);
   if (tariffsState.checkoutResult) {
     const r = tariffsState.checkoutResult;
     if (r.method === 'stars') {
       return `<div class="da-checkout"><p>Открываю оплату через Telegram Stars…</p></div>`;
     }
-    if (r.method === 'card') {
+    if (r.method === 'cryptobot') {
       return `<div class="da-checkout">
-        <p>Заявка создана. ${esc(r.instructions)}</p>
-        ${r.adminContact ? `<button class="da-btn-primary" data-open-admin="${esc(r.adminContact)}">Написать администратору</button>` : '<p class="da-inline-error">Контакт администратора не настроен — впишите ADMIN_CONTACT_USERNAME в config/.env бота.</p>'}
-      </div>`;
-    }
-    if (r.method === 'crypto') {
-      return `<div class="da-checkout">
-        <p>${esc(r.networkLabel)} · адрес для перевода:</p>
-        <code class="da-code-block">${esc(r.address)}</code>
-        <p class="da-hint-block">${esc(r.instructions)}</p>
+        <p>Счёт на оплату создан. Откройте ссылку, чтобы оплатить криптовалютой:</p>
+        ${r.payUrl ? `<button class="da-btn-primary" data-open-pay="${esc(r.payUrl)}">${icon('externalLink')} Перейти к оплате</button>` : ''}
+        <p class="da-hint-block">Тариф активируется автоматически сразу после оплаты.</p>
       </div>`;
     }
   }
   return `
   <div class="da-checkout">
-    <p>Оплата тарифа <b>${esc(plan)}</b> — выберите способ:</p>
+    <p>Оплата тарифа <b>${esc(plan?.title || planCode)}</b> — выберите способ:</p>
     <div class="da-actions">
-      <button class="da-btn-primary" data-method="stars">${icon('star')} Telegram Stars</button>
-      <button class="da-btn-secondary" data-method="card">${icon('creditCard')} Карта (через админа)</button>
-      <button class="da-btn-secondary" data-method="crypto">₿ Крипта (USDT)</button>
+      <button class="da-btn-secondary" data-method="cryptobot">₿ Криптовалюта (USDT/TON/BTC)</button>
+      ${isInsideTelegram() ? `<button class="da-btn-primary" data-method="stars">${icon('star')} Telegram Stars</button>` : ''}
     </div>
     ${tariffsState.checkoutError ? `<div class="da-inline-error">${icon('alertTriangle')} ${esc(tariffsState.checkoutError)}</div>` : ''}
   </div>`;
@@ -1062,14 +1093,15 @@ async function loadTariffs() {
   tariffsState.loading = true;
   render();
   try {
-    const [plansData, status] = await Promise.all([
+    const [plansData, status, limit] = await Promise.all([
       docsApi.getPlans(),
       docsApi.getBillingStatus(),
+      docsApi.getDocsLimit(),
     ]);
-    tariffsState = { plans: plansData.plans, status, loading: false, error: null, checkoutFor: null, checkoutResult: null, checkoutError: null };
+    tariffsState = { plans: plansData.plans, status, limit, loading: false, error: null, checkoutFor: null, checkoutResult: null, checkoutError: null };
     render();
   } catch (e) {
-    tariffsState = { plans: null, status: null, loading: false, error: e.message, checkoutFor: null, checkoutResult: null, checkoutError: null };
+    tariffsState = { plans: null, status: null, limit: null, loading: false, error: e.message, checkoutFor: null, checkoutResult: null, checkoutError: null };
     render();
   }
 }
@@ -1091,21 +1123,19 @@ function wireTariffs() {
       const method = btn.dataset.method;
       const plan = tariffsState.checkoutFor;
 
-      if (method === 'crypto') {
-        // Простая заглушка выбора сети через нативный confirm — полноценный
-        // выбор из трёх сетей легко доразвернуть в отдельный экран при желании.
-        const network = window.prompt('Сеть USDT: ton, trc20 или bep20', 'trc20');
+      if (method === 'cryptobot') {
+        const network = window.prompt('Актив для оплаты: USDT, TON или BTC', 'USDT');
         if (!network) return;
-        await runCheckout(plan, method, network.trim());
+        await runCheckout(plan, method, network.trim().toUpperCase());
         return;
       }
       await runCheckout(plan, method);
     });
   });
 
-  const adminBtn = root.querySelector('[data-open-admin]');
-  if (adminBtn) adminBtn.addEventListener('click', () => {
-    openTelegramLink(`https://t.me/${adminBtn.dataset.openAdmin}`);
+  const payBtn = root.querySelector('[data-open-pay]');
+  if (payBtn) payBtn.addEventListener('click', () => {
+    openTelegramLink(payBtn.dataset.openPay);
   });
 }
 
@@ -1122,7 +1152,7 @@ async function runCheckout(plan, method, network) {
           if (status === 'paid') {
             haptic('medium');
             showAlert('Оплата прошла успешно! Тариф активирован.');
-            tariffsState = { plans: null, status: null, loading: false, error: null, checkoutFor: null, checkoutResult: null, checkoutError: null };
+            tariffsState = { plans: null, status: null, limit: null, loading: false, error: null, checkoutFor: null, checkoutResult: null, checkoutError: null };
             loadTariffs();
           }
         });
@@ -1147,7 +1177,6 @@ function wireScreen(screen) {
     case 'templates': wireTemplateList(); break;
     case 'wizard': wireWizard(screen.params); break;
     case 'preview': wirePreview(screen.params); break;
-    case 'ai': wireAi(); break;
     case 'custom': wireCustom(); break;
     case 'mydocs': wireMyDocuments(); break;
     case 'mydoc-detail': wireMyDocumentDetail(); break;

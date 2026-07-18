@@ -8,6 +8,7 @@
 export const DOCS_API_BASE_URL = window.CODENEXA_DOCS_API_BASE_URL || '';
 
 import { getInitDataRaw } from '../telegram.js';
+import { getToken } from '../api/authApi.js';
 
 export class ApiError extends Error {
   constructor(message, status) {
@@ -16,10 +17,25 @@ export class ApiError extends Error {
   }
 }
 
+// Раздел AI Docs открывается и внутри Telegram-мини-аппа, и в обычном
+// браузере (аккаунт по email/Google/Yandex) — это НЕ телеграм-бот, аккаунт
+// в вебе первичен. Поэтому сперва проверяем обычную веб-сессию (JWT из
+// authApi.js, тот же токен, что используют investorsApi.js и т.д.), и
+// только если её нет — initData Telegram. Раньше здесь проверялся только
+// Telegram, из-за чего залогиненный по email пользователь не отправлял
+// вообще никакого заголовка Authorization и получал 401 на каждый запрос.
+function authHeader() {
+  const token = getToken();
+  if (token) return `Bearer ${token}`;
+  const initData = getInitDataRaw();
+  if (initData) return `tma ${initData}`;
+  return null;
+}
+
 async function request(path, { method = 'GET', body, isForm = false } = {}) {
   const headers = {};
-  const initData = getInitDataRaw();
-  if (initData) headers['Authorization'] = `tma ${initData}`;
+  const auth = authHeader();
+  if (auth) headers['Authorization'] = auth;
   if (!isForm && body !== undefined) headers['Content-Type'] = 'application/json';
 
   let res;
@@ -57,8 +73,8 @@ export const docsApi = {
   // ссылка <a href> не подойдёт — качаем как blob и триггерим сохранение.
   downloadFile: async (id, format, filename) => {
     const headers = {};
-    const initData = getInitDataRaw();
-    if (initData) headers['Authorization'] = `tma ${initData}`;
+    const auth = authHeader();
+    if (auth) headers['Authorization'] = auth;
     const res = await fetch(`${DOCS_API_BASE_URL}/api/documents/${id}/file?format=${format}`, { headers });
     if (!res.ok) {
       let msg = `Ошибка сервера (${res.status})`;
@@ -76,10 +92,12 @@ export const docsApi = {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   },
 
-  // --- AI-конструктор и произвольный документ ---
-  aiParse: (text) => request('/api/ai/parse', { method: 'POST', body: { text } }),
+  // --- Свой документ (без AI — пользователь сам пишет текст, см. docs.py) ---
   previewCustomDocument: (description) => request('/api/custom-document/preview', { method: 'POST', body: { description } }),
   saveCustomDocument: (description, finalText) => request('/api/custom-document', { method: 'POST', body: { description, finalText } }),
+
+  // --- Дневной лимит бесплатного тарифа ---
+  getDocsLimit: () => request('/api/documents/limit'),
 
   // --- Профиль ---
   getProfile: () => request('/api/profile'),

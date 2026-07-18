@@ -932,3 +932,70 @@ def get_document(doc_id: int, user_id: int):
 def delete_document(doc_id: int, user_id: int):
     with tx() as conn:
         conn.execute("DELETE FROM documents WHERE id = ? AND user_id = ?", (doc_id, user_id))
+
+
+# --- профиль раздела "Документы" (автоподстановка ФИО/реквизитов, логотип, подпись) ---
+
+_PROFILE_FIELDS = (
+    "full_name", "city", "position", "company_name", "bin_iin",
+    "requisites", "address", "signature_name", "pdf_theme",
+)
+
+
+def get_document_profile(user_id: int):
+    row = _fetch_one("SELECT * FROM document_profiles WHERE user_id = ?", (user_id,))
+    if row:
+        return row
+    # Профиля ещё нет — отдаём пустой шаблон, не создавая строку в БД
+    # раньше времени (создастся при первом PUT/загрузке файла).
+    return {f: "" for f in _PROFILE_FIELDS} | {
+        "user_id": user_id, "logo_path": None, "signature_path": None, "pdf_theme": "classic",
+    }
+
+
+def upsert_document_profile(user_id: int, fields: dict):
+    clean = {k: str(v).strip() for k, v in fields.items() if k in _PROFILE_FIELDS}
+    with tx() as conn:
+        exists = conn.execute(
+            "SELECT 1 FROM document_profiles WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if exists:
+            if clean:
+                set_clause = ", ".join(f"{k} = ?" for k in clean)
+                conn.execute(
+                    f"UPDATE document_profiles SET {set_clause}, updated_at = NOW() WHERE user_id = ?",
+                    (*clean.values(), user_id),
+                )
+        else:
+            cols = ["user_id", *clean.keys()]
+            placeholders = ", ".join(["?"] * len(cols))
+            conn.execute(
+                f"INSERT INTO document_profiles ({', '.join(cols)}) VALUES ({placeholders})",
+                (user_id, *clean.values()),
+            )
+        return row_to_dict(conn.execute(
+            "SELECT * FROM document_profiles WHERE user_id = ?", (user_id,)
+        ).fetchone())
+
+
+def set_document_profile_file(user_id: int, kind: str, path: str | None):
+    """kind: 'logo_path' | 'signature_path'."""
+    if kind not in ("logo_path", "signature_path"):
+        raise ValueError("kind должен быть logo_path или signature_path")
+    with tx() as conn:
+        exists = conn.execute(
+            "SELECT 1 FROM document_profiles WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if exists:
+            conn.execute(
+                f"UPDATE document_profiles SET {kind} = ?, updated_at = NOW() WHERE user_id = ?",
+                (path, user_id),
+            )
+        else:
+            conn.execute(
+                f"INSERT INTO document_profiles (user_id, {kind}) VALUES (?, ?)",
+                (user_id, path),
+            )
+        return row_to_dict(conn.execute(
+            "SELECT * FROM document_profiles WHERE user_id = ?", (user_id,)
+        ).fetchone())

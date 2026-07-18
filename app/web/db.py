@@ -490,6 +490,25 @@ CREATE TABLE IF NOT EXISTS documents (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id, created_at DESC);
+
+-- Профиль раздела "Документы": данные, которые пользователь один раз
+-- вводит и они автоматически доступны для подстановки/шапки документа
+-- (ФИО, реквизиты, логотип, подпись). Один профиль на пользователя.
+CREATE TABLE IF NOT EXISTS document_profiles (
+    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL DEFAULT '',
+    city TEXT NOT NULL DEFAULT '',
+    position TEXT NOT NULL DEFAULT '',
+    company_name TEXT NOT NULL DEFAULT '',
+    bin_iin TEXT NOT NULL DEFAULT '',
+    requisites TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT '',
+    signature_name TEXT NOT NULL DEFAULT '',
+    logo_path TEXT,
+    signature_path TEXT,
+    pdf_theme TEXT NOT NULL DEFAULT 'classic',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 """
 
 
@@ -642,6 +661,229 @@ _DEFAULT_TEMPLATES = (
             "Кому: {{recipient}}\n\n"
             "{{explanation}}\n\n"
             "Дата: {{date}}\n"
+        ),
+    },
+    # --- Договоры ---
+    {
+        "code": "loan_receipt",
+        "category": "Договоры",
+        "title": "Расписка о займе",
+        "description": "Расписка о получении денежных средств в долг с обязательством возврата.",
+        "fields": [
+            {"key": "borrower_name", "question": "ФИО заёмщика (кто берёт в долг)", "required": True},
+            {"key": "lender_name", "question": "ФИО займодавца (кто даёт в долг)", "required": True},
+            {"key": "amount", "question": "Сумма займа", "required": True, "isMoney": True},
+            {"key": "amount_words", "question": "Сумма прописью", "required": False,
+             "hint": "Например: сто тысяч тенге"},
+            {"key": "return_date", "question": "Срок возврата (дата)", "required": True},
+            {"key": "notes", "question": "Дополнительные условия (проценты, порядок возврата)",
+             "required": False, "multiline": True},
+        ],
+        "body_template": (
+            "РАСПИСКА\n\n"
+            "Я, {{borrower_name}}, получил от {{lender_name}} денежные средства в размере "
+            "{{amount}} тенге ({{amount_words}}) в качестве займа и обязуюсь вернуть указанную "
+            "сумму в полном объёме в срок до {{return_date}}.\n\n"
+            "{{notes}}\n"
+        ),
+    },
+    {
+        "code": "consulting_services_agreement",
+        "category": "Договоры",
+        "title": "Договор оказания консультационных услуг",
+        "description": "Договор между исполнителем и заказчиком на оказание консультационных/сопровождающих услуг.",
+        "locked": True,
+        "fields": [
+            {"key": "contractor_name", "question": "Исполнитель (ФИО/ИП/ТОО)", "required": True},
+            {"key": "client_name", "question": "Заказчик (ФИО/ИП/ТОО)", "required": True},
+            {"key": "subject", "question": "Предмет договора — что именно делает исполнитель",
+             "required": True, "multiline": True},
+            {"key": "term", "question": "Срок действия договора", "required": True,
+             "hint": "Например: 3 месяца с даты подписания"},
+            {"key": "amount", "question": "Стоимость услуг", "required": True, "isMoney": True},
+            {"key": "payment_terms", "question": "Порядок оплаты", "required": False,
+             "multiline": True, "hint": "Например: ежемесячно, до 5 числа"},
+        ],
+        "body_template": (
+            "ДОГОВОР ОКАЗАНИЯ КОНСУЛЬТАЦИОННЫХ УСЛУГ\n\n"
+            "Исполнитель: {{contractor_name}}\n"
+            "Заказчик: {{client_name}}\n\n"
+            "1. Предмет договора\n{{subject}}\n\n"
+            "2. Срок действия\n{{term}}\n\n"
+            "3. Стоимость и порядок оплаты\nСтоимость услуг составляет {{amount}} тенге. "
+            "{{payment_terms}}\n"
+        ),
+    },
+    {
+        "code": "nda_agreement",
+        "category": "Договоры",
+        "title": "Соглашение о неразглашении (NDA)",
+        "description": "Двустороннее соглашение о конфиденциальности передаваемой информации.",
+        "fields": [
+            {"key": "party_a", "question": "Сторона 1 (ФИО/компания)", "required": True},
+            {"key": "party_b", "question": "Сторона 2 (ФИО/компания)", "required": True},
+            {"key": "purpose", "question": "Цель раскрытия информации", "required": True,
+             "multiline": True, "hint": "Например: обсуждение условий партнёрства"},
+            {"key": "term", "question": "Срок действия обязательств о конфиденциальности",
+             "required": True, "hint": "Например: 2 года с даты подписания"},
+        ],
+        "body_template": (
+            "СОГЛАШЕНИЕ О НЕРАЗГЛАШЕНИИ КОНФИДЕНЦИАЛЬНОЙ ИНФОРМАЦИИ (NDA)\n\n"
+            "{{party_a}} и {{party_b}} заключили настоящее соглашение о нижеследующем.\n\n"
+            "1. Цель раскрытия информации: {{purpose}}\n\n"
+            "2. Стороны обязуются не разглашать третьим лицам конфиденциальную информацию, "
+            "полученную друг от друга в связи с указанной целью, в течение срока: {{term}}.\n"
+        ),
+    },
+    # --- Кадры / HR ---
+    {
+        "code": "employment_offer",
+        "category": "Кадры",
+        "title": "Оффер (предложение о работе)",
+        "description": "Письмо-предложение кандидату с условиями трудоустройства.",
+        "fields": [
+            {"key": "candidate_name", "question": "ФИО кандидата", "required": True},
+            {"key": "position", "question": "Должность", "required": True},
+            {"key": "salary", "question": "Оклад", "required": True, "isMoney": True},
+            {"key": "start_date", "question": "Дата выхода на работу", "required": True},
+            {"key": "conditions", "question": "Дополнительные условия", "required": False,
+             "multiline": True, "hint": "График, испытательный срок, бонусы"},
+        ],
+        "body_template": (
+            "ПРЕДЛОЖЕНИЕ О РАБОТЕ\n\n"
+            "Уважаемый(ая) {{candidate_name}},\n\n"
+            "Мы рады предложить вам должность «{{position}}» с окладом {{salary}} тенге "
+            "и датой выхода на работу {{start_date}}.\n\n"
+            "{{conditions}}\n"
+        ),
+    },
+    {
+        "code": "resignation_letter",
+        "category": "Кадры",
+        "title": "Заявление на увольнение",
+        "description": "Заявление об увольнении по собственному желанию.",
+        "fields": [
+            {"key": "full_name", "question": "Ваше ФИО", "required": True},
+            {"key": "position", "question": "Ваша должность", "required": True},
+            {"key": "recipient", "question": "На чьё имя (руководитель, должность)", "required": True},
+            {"key": "last_day", "question": "Последний рабочий день", "required": True},
+        ],
+        "body_template": (
+            "ЗАЯВЛЕНИЕ\n\n"
+            "{{recipient}}\n"
+            "от {{full_name}}, {{position}}\n\n"
+            "Прошу уволить меня по собственному желанию с {{last_day}}.\n"
+        ),
+    },
+    {
+        "code": "vacation_request",
+        "category": "Кадры",
+        "title": "Заявление на отпуск",
+        "description": "Заявление на предоставление ежегодного оплачиваемого отпуска.",
+        "fields": [
+            {"key": "full_name", "question": "Ваше ФИО", "required": True},
+            {"key": "position", "question": "Ваша должность", "required": True},
+            {"key": "recipient", "question": "На чьё имя (руководитель, должность)", "required": True},
+            {"key": "start_date", "question": "Дата начала отпуска", "required": True},
+            {"key": "days", "question": "Количество дней", "required": True},
+        ],
+        "body_template": (
+            "ЗАЯВЛЕНИЕ\n\n"
+            "{{recipient}}\n"
+            "от {{full_name}}, {{position}}\n\n"
+            "Прошу предоставить мне ежегодный оплачиваемый отпуск на {{days}} "
+            "календарных дней с {{start_date}}.\n"
+        ),
+    },
+    # --- Финансы ---
+    {
+        "code": "invoice_simple",
+        "category": "Финансы",
+        "title": "Счёт на оплату",
+        "description": "Простой счёт на оплату товаров/услуг для контрагента.",
+        "fields": [
+            {"key": "seller_name", "question": "Поставщик (ИП/ТОО, реквизиты)", "required": True,
+             "multiline": True},
+            {"key": "buyer_name", "question": "Покупатель", "required": True},
+            {"key": "items", "question": "Товары/услуги (по одной строке)", "required": True,
+             "multiline": True, "hint": "Например: Консультация — 50 000 тенге"},
+            {"key": "amount", "question": "Итого к оплате", "required": True, "isMoney": True},
+            {"key": "due_date", "question": "Оплатить до", "required": False},
+        ],
+        "body_template": (
+            "СЧЁТ НА ОПЛАТУ\n\n"
+            "Поставщик: {{seller_name}}\n"
+            "Покупатель: {{buyer_name}}\n\n"
+            "{{items}}\n\n"
+            "Итого к оплате: {{amount}} тенге\n"
+            "Оплатить до: {{due_date}}\n"
+        ),
+    },
+    {
+        "code": "act_of_completion",
+        "category": "Финансы",
+        "title": "Акт выполненных работ",
+        "description": "Акт приёма-передачи выполненных работ/оказанных услуг между сторонами.",
+        "fields": [
+            {"key": "contractor_name", "question": "Исполнитель", "required": True},
+            {"key": "client_name", "question": "Заказчик", "required": True},
+            {"key": "work_description", "question": "Описание выполненных работ", "required": True,
+             "multiline": True},
+            {"key": "amount", "question": "Сумма", "required": True, "isMoney": True},
+            {"key": "act_date", "question": "Дата составления акта", "required": True},
+        ],
+        "body_template": (
+            "АКТ ВЫПОЛНЕННЫХ РАБОТ №___ от {{act_date}}\n\n"
+            "Исполнитель: {{contractor_name}}\n"
+            "Заказчик: {{client_name}}\n\n"
+            "Исполнитель выполнил, а Заказчик принял следующие работы:\n{{work_description}}\n\n"
+            "Стоимость выполненных работ составляет {{amount}} тенге. "
+            "Стороны претензий друг к другу не имеют.\n"
+        ),
+    },
+    {
+        "code": "power_of_attorney_finance",
+        "category": "Финансы",
+        "title": "Доверенность на представление интересов",
+        "description": "Доверенность на ведение финансовых/юридических дел от имени доверителя.",
+        "locked": True,
+        "fields": [
+            {"key": "principal_name", "question": "ФИО доверителя", "required": True},
+            {"key": "attorney_name", "question": "ФИО поверенного", "required": True},
+            {"key": "powers", "question": "Какие полномочия передаются", "required": True,
+             "multiline": True, "hint": "Например: представлять интересы в банке, подписывать документы"},
+            {"key": "valid_until", "question": "Срок действия доверенности", "required": True},
+        ],
+        "body_template": (
+            "ДОВЕРЕННОСТЬ\n\n"
+            "Я, {{principal_name}}, настоящей доверенностью уполномочиваю {{attorney_name}} "
+            "на следующее: {{powers}}.\n\n"
+            "Доверенность действительна до {{valid_until}}.\n"
+        ),
+    },
+    # --- Бизнес ---
+    {
+        "code": "commercial_proposal",
+        "category": "Бизнес",
+        "title": "Коммерческое предложение",
+        "description": "Презентационное предложение услуг/продукта потенциальному клиенту.",
+        "locked": True,
+        "fields": [
+            {"key": "company_name", "question": "Название вашей компании", "required": True},
+            {"key": "recipient", "question": "Кому адресовано", "required": False},
+            {"key": "offer", "question": "Что вы предлагаете", "required": True, "multiline": True},
+            {"key": "benefits", "question": "Ключевые преимущества", "required": True,
+             "multiline": True},
+            {"key": "price", "question": "Стоимость / условия", "required": False},
+            {"key": "contacts", "question": "Контакты для связи", "required": True},
+        ],
+        "body_template": (
+            "КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ\n\n"
+            "{{recipient}}\n\n"
+            "Компания {{company_name}} предлагает: {{offer}}\n\n"
+            "Преимущества:\n{{benefits}}\n\n"
+            "Стоимость и условия: {{price}}\n\n"
+            "Контакты: {{contacts}}\n"
         ),
     },
 )

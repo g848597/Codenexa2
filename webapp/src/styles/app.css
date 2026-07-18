@@ -386,7 +386,8 @@ button[data-acc-buy], button[data-acc-2fa-start], button[data-acc-revoke-session
 .da-tile:hover .da-tile-icon, .sa-team-card:hover .sa-venue-icon { transform: scale(1.1); }
 .da-tile-hint { font-size: 10.5px; color: var(--text-faint); margin-top: 4px; }
 
-.da-list-item, .sa-fixture-list > * { padding: 12px 14px; border-radius: var(--radius-sm); background: var(--bg-card); border: 1px solid var(--line); margin-bottom: 8px; }
+.da-list-item, .sa-fixture-list > * { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--bg-card); border: 1px solid var(--line); margin-bottom: 8px; cursor: pointer; color: inherit; font: inherit; }
+.da-list-item:hover, .sa-fixture-list > *:hover { border-color: var(--line-strong); background: var(--bg-elevated); }
 .da-list-title { font-size: 13.5px; font-weight: 600; }
 .da-list-desc { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
 .da-list-count { font-size: 10.5px; color: var(--text-faint); font-family: var(--font-mono); }
@@ -460,6 +461,44 @@ button[data-acc-buy], button[data-acc-2fa-start], button[data-acc-revoke-session
 .da-list { display: flex; flex-direction: column; gap: 8px; }
 .da-arrow { color: var(--text-faint); }
 .da-actions { display: flex; gap: 8px; margin-top: 6px; }
+
+/* .da-plan была объявлена только через дочерние селекторы (title/price/
+   features) — сама карточка не имела ни фона, ни границ, ни отступов. */
+.da-plan { padding: 16px; border-radius: var(--radius-md); background: var(--bg-card); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.da-plan.current { border-color: var(--ledger); box-shadow: 0 0 0 1px rgba(0,217,160,0.25); }
+.da-plan .da-btn-primary { margin-top: 10px; }
+
+/* --- Чат-визард заполнения шаблона: вопрос за вопросом, как переписка --- */
+.da-chat { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; padding: 4px 2px 8px; scroll-behavior: smooth; }
+.da-chat-msg { display: flex; }
+.da-chat-bot { justify-content: flex-start; }
+.da-chat-user { justify-content: flex-end; border: none; background: none; padding: 0; cursor: pointer; }
+.da-chat-bubble {
+  max-width: 82%; padding: 10px 13px; border-radius: 14px; font-size: 13px; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word; text-align: left;
+}
+.da-chat-bot .da-chat-bubble { background: var(--bg-elevated); border: 1px solid var(--line); color: var(--text); border-bottom-left-radius: 4px; }
+.da-chat-user .da-chat-bubble { background: var(--gradient-ledger); color: var(--on-ledger); border-bottom-right-radius: 4px; display: flex; align-items: center; gap: 8px; }
+.da-chat-user-edit { transition: opacity .15s var(--ease); }
+.da-chat-user-edit:hover { opacity: .85; }
+.da-chat-edit-hint { font-size: 10px; opacity: .8; white-space: nowrap; display: inline-flex; align-items: center; gap: 3px; }
+.da-chat-progress { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+.da-chat-hint { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+.da-chat-footer { margin-top: 4px; }
+
+.da-chat-input { display: flex; align-items: flex-end; gap: 8px; position: sticky; bottom: 0; background: var(--bg); padding-top: 6px; }
+.da-chat-input-el, .da-chat-textarea {
+  flex: 1; background: var(--bg-elevated); border: 1px solid var(--line-strong); border-radius: 12px;
+  padding: 11px 13px; font-size: 13px; color: var(--text); font-family: var(--font-body); resize: none;
+}
+.da-chat-input-el:focus, .da-chat-textarea:focus { outline: none; border-color: var(--ledger); }
+.da-chat-send {
+  flex: 0 0 auto; width: 42px; height: 42px; border-radius: 12px; border: none; cursor: pointer;
+  background: var(--gradient-ledger); color: var(--on-ledger); display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--glow-ledger);
+}
+.da-list-item.locked { border-color: rgba(255,196,64,0.25); }
+.da-lock { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10.5px; color: var(--amber, #ffc440); text-transform: uppercase; letter-spacing: .3px; }
 .photo-actions { display: flex; gap: 8px; margin-top: 8px; }
 .preview-fallback { color: var(--text-faint); font-size: 22px; display: flex; align-items: center; justify-content: center; }
 .thumb-fallback { background: var(--bg-elevated); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; color: var(--text-faint); }
