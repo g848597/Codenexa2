@@ -70,3 +70,8 @@ async def team_matches(team_id: str) -> dict:
 async def live_matches() -> list[dict]:
     result = await _call("live_matches")
     return result or []
+
+
+async def matches_by_date(date_str: str) -> list[dict]:
+    result = await _call("matches_by_date", date_str)
+    return result or []

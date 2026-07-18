@@ -200,3 +200,10 @@ async def live_matches() -> list[dict]:
     data = await _get("/fixtures/live")
     raw_matches = data.get("data") or data.get("matches") or []
     return [_map_fixture(m) for m in raw_matches if isinstance(m, dict)]
+
+
+async def matches_by_date(date_str: str) -> list[dict]:
+    """date_str в формате YYYY-MM-DD (см. документацию: /fixtures?date=)."""
+    data = await _get("/fixtures", params={"date": date_str}, cache_key=f"fixtures:{date_str}")
+    raw_matches = data.get("data") or data.get("matches") or []
+    return [_map_fixture(m) for m in raw_matches if isinstance(m, dict)]

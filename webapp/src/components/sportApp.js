@@ -151,6 +151,7 @@ export function openSportApp() {
   screenStack = [{ name: 'home' }];
   homeState = { popular: null, error: null };
   homeLive = { matches: null, loaded: false };
+  dayMatches = { when: 'today', matches: null, limited: false, total: 0, loaded: false, error: null };
   plansState = { plans: null };
   searchState = { query: '', results: null, loading: false, error: null };
   render();
@@ -247,6 +248,7 @@ function wireCommon() {
 let homeState = { popular: null, error: null };
 let homeLive = { matches: null, loaded: false };
 let plansState = { plans: null }; // реальные тарифы — authApi.plans() (см. accountApp.js/billingHTML)
+let dayMatches = { when: 'today', matches: null, limited: false, total: 0, loaded: false, error: null };
 
 function renderHome() {
   if (!homeState.popular && !homeState.error) {
@@ -269,6 +271,32 @@ function renderHome() {
   const configuredHint = apiConfigured === false
     ? `<div class="sa-hint-block">Источник живых данных (api-football) пока не подключён на сервере — показываем команды по названиям без гербов и статистики. Как только появится ключ API, здесь честно появятся реальные данные.</div>`
     : '';
+
+  // "Матчи на дату" — реальные фикстуры за сегодня/завтра (см.
+  // /api/sport/matches). Бесплатно виден 1 матч, остальное — по PRO (см.
+  // FREE_MATCHES_LIMIT в sport_routes.py); это ограничение доступа к
+  // настоящим данным, а не выдуманные цифры — сами матчи всегда реальные.
+  const dayBody = dayMatches.error
+    ? errorHTML(dayMatches.error)
+    : !dayMatches.loaded
+      ? loadingHTML('Загружаю матчи…')
+      : !dayMatches.matches || !dayMatches.matches.length
+        ? `<div class="sa-empty-mini">${dayMatches.when === 'today' ? 'Сегодня' : 'Завтра'} матчей по отслеживаемым лигам не найдено.</div>`
+        : `<div class="sa-fixture-list">${dayMatches.matches.map(fixtureRowHTML).join('')}</div>
+           ${dayMatches.limited ? `
+             <button class="sa-upsell" data-open-pro>
+               ${icon('crown')} Ещё ${dayMatches.total - dayMatches.matches.length} матч(-а/-ей) сегодня — открыть в PRO
+             </button>` : ''}`;
+
+  const daySection = `
+  <div class="sa-section-head sa-day-head">
+    <h2>Матчи по дням</h2>
+    <div class="sa-day-tabs">
+      <button class="sa-day-tab ${dayMatches.when === 'today' ? 'active' : ''}" data-day="today">Сегодня</button>
+      <button class="sa-day-tab ${dayMatches.when === 'tomorrow' ? 'active' : ''}" data-day="tomorrow">Завтра</button>
+    </div>
+  </div>
+  ${dayBody}`;
 
   let liveSection = '';
   if (homeLive.loaded && homeLive.matches && homeLive.matches.length) {
@@ -327,6 +355,8 @@ function renderHome() {
 
   ${plansSection}
 
+  ${daySection}
+
   ${liveSection || (apiConfigured !== false ? `<div class="sa-empty-mini">Live-матчей прямо сейчас нет — загляните позже, табло обновляется автоматически.</div>` : '')}
 
   ${configuredHint}
@@ -353,10 +383,30 @@ async function loadHomeAsync() {
       homeLive = { matches: null, loaded: true };
     }
     render();
+    loadDayMatches('today');
   } catch (e) {
     homeState = { popular: null, error: e.message };
     render();
   }
+}
+
+async function loadDayMatches(when) {
+  dayMatches = { when, matches: null, limited: false, total: 0, loaded: false, error: null };
+  render();
+  try {
+    const data = await sportApi.matchesByDate(when);
+    dayMatches = {
+      when,
+      matches: data.matches || [],
+      limited: !!data.limited,
+      total: data.total || (data.matches || []).length,
+      loaded: true,
+      error: null,
+    };
+  } catch (e) {
+    dayMatches = { when, matches: null, limited: false, total: 0, loaded: true, error: e.message };
+  }
+  render();
 }
 
 function wireHome() {
@@ -388,6 +438,11 @@ function wireHome() {
   root.querySelectorAll('[data-scroll-teams]').forEach((btn) => btn.addEventListener('click', () => {
     haptic('light');
     document.getElementById('sa-teams-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+
+  root.querySelectorAll('[data-day]').forEach((btn) => btn.addEventListener('click', () => {
+    haptic('light');
+    if (btn.dataset.day !== dayMatches.when) loadDayMatches(btn.dataset.day);
   }));
 
   // Реальные тарифы/оплата уже реализованы в личном кабинете (см.

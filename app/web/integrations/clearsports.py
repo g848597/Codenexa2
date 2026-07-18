@@ -236,3 +236,16 @@ async def live_matches() -> list[dict]:
             if isinstance(m, dict) and str(first(m, "status", default="")).strip().lower() in ("live", "in_progress"):
                 live.append(_map_fixture(m))
     return live
+
+
+async def matches_by_date(date_str: str) -> list[dict]:
+    matches: list[dict] = []
+    for league in _LEAGUES:
+        try:
+            data = await _get(f"/{league}/games", params={"date": date_str}, cache_key=f"cs_games:{league}:{date_str}")
+        except SportProviderError:
+            continue
+        raw_matches = data.get("data") or data.get("games") or []
+        if isinstance(raw_matches, list):
+            matches.extend(_map_fixture(m) for m in raw_matches if isinstance(m, dict))
+    return matches

@@ -11,12 +11,31 @@ app/web/integrations/sport_provider.py: footballdata.io -> clearsportsapi.com
 пользователей, поэтому, в отличие от /api/billing, /api/referrals и т.д.,
 авторизация здесь не требуется.
 """
-from fastapi import APIRouter, HTTPException, Query
+from datetime import date, timedelta
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.web import repo
+from app.web.deps import get_current_user_optional
 from app.web.integrations import sport_provider as sport
 from app.web.integrations.sport_common import SportProviderError
 
 router = APIRouter(prefix="/api/sport", tags=["sport"])
+
+# Бесплатный показ ограничен, чтобы не отдавать полную сетку матчей без
+# подписки (см. чат — просьба владельца проекта). "PRO" здесь — та же самая
+# проверка, что и в личном кабинете (webapp/src/components/profile/
+# subscriptionCard.js): есть хотя бы один платёж со статусом paid. Отдельного
+# expires_at в схеме payments пока нет (см. комментарий там же), поэтому это
+# намеренно простая проверка "платил хоть раз", а не строгая проверка
+# активной подписки на сегодняшний день.
+FREE_MATCHES_LIMIT = 1
+
+
+def _has_paid(user: dict | None) -> bool:
+    if not user:
+        return False
+    return any(p["status"] == "paid" for p in repo.list_payments(user["id"]))
 
 
 @router.get("/status")
@@ -83,3 +102,24 @@ async def live():
     except SportProviderError:
         return {"matches": [], "configured": True, "degraded": True}
     return {"matches": matches, "configured": True}
+
+
+@router.get("/matches")
+async def matches(
+    when: str = Query("today", pattern="^(today|tomorrow)$"),
+    user: dict | None = Depends(get_current_user_optional),
+):
+    if not sport.is_configured():
+        return {"matches": [], "configured": False, "limited": False, "total": 0}
+
+    target_date = date.today() if when == "today" else date.today() + timedelta(days=1)
+    try:
+        found = await sport.matches_by_date(target_date.isoformat())
+    except SportProviderError:
+        return {"matches": [], "configured": True, "degraded": True, "limited": False, "total": 0}
+
+    total = len(found)
+    if _has_paid(user):
+        return {"matches": found, "configured": True, "limited": False, "total": total}
+
+    return {"matches": found[:FREE_MATCHES_LIMIT], "configured": True, "limited": total > FREE_MATCHES_LIMIT, "total": total}

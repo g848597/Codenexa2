@@ -3,6 +3,7 @@
 // домен с мини-аппом, никакого отдельного CORS-конфига не требуется.
 
 import { getInitDataRaw } from '../telegram.js';
+import { getToken } from '../api/authApi.js';
 
 const SPORT_API_BASE_URL = window.CODENEXA_DOCS_API_BASE_URL || '';
 
@@ -16,7 +17,13 @@ export class SportApiError extends Error {
 async function request(path) {
   const headers = {};
   const initData = getInitDataRaw();
+  const token = getToken();
+  // Порядок важен: initData (Telegram) приоритетнее — так же, как в
+  // authApi.js/docsApi.js. Вне Telegram используем обычный JWT-токен сессии,
+  // иначе /api/sport/matches не сможет определить PRO-статус для тех, кто
+  // вошёл по email/паролю, а не через бота.
   if (initData) headers['Authorization'] = `tma ${initData}`;
+  else if (token) headers['Authorization'] = `Bearer ${token}`;
 
   let res;
   try {
@@ -41,4 +48,5 @@ export const sportApi = {
   teamDetail: (id) => request(`/api/sport/teams/${encodeURIComponent(id)}`),
   teamMatches: (id) => request(`/api/sport/teams/${encodeURIComponent(id)}/matches`),
   liveMatches: () => request('/api/sport/live'),
+  matchesByDate: (when) => request(`/api/sport/matches?when=${encodeURIComponent(when)}`),
 };

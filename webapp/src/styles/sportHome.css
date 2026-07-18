@@ -123,6 +123,17 @@
   background: var(--bg-card); border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); margin-bottom: 16px;
 }
 
+.sa-day-head { display: flex; align-items: center; justify-content: space-between; }
+.sa-day-tabs { display: flex; gap: 6px; background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 3px; }
+.sa-day-tab { padding: 6px 14px; border-radius: 7px; border: none; background: none; color: var(--text-dim); font-size: 12px; font-weight: 500; cursor: pointer; }
+.sa-day-tab.active { background: var(--bg-card); color: var(--text); box-shadow: 0 1px 6px rgba(0,0,0,0.25); }
+.sa-upsell {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 7px;
+  margin-top: 8px; padding: 11px; border-radius: var(--radius-sm);
+  background: var(--ledger-dim); border: 1px dashed var(--ledger); color: var(--ledger);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+
 /* ---------- заголовки секций / ссылки ---------- */
 
 .sa-h2, .sa-section-head h2 { font-family: var(--font-display); font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
