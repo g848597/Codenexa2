@@ -99,6 +99,8 @@
 .hub-sub-badge { font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 10px; font-family: var(--font-mono); text-transform: uppercase; }
 .hub-sub-badge.active { background: var(--ledger-dim); color: var(--ledger); }
 .hub-sub-badge.inactive { background: var(--bg-elevated); color: var(--text-faint); border: 1px solid var(--line); }
+.hub-sub-badge.warning { background: var(--amber-dim); color: var(--amber); }
+.hub-sub-badge.expired { background: rgba(255,90,64,0.14); color: var(--danger-text); }
 .hub-sub-meta { display: flex; flex-wrap: wrap; gap: 16px; margin: 14px 0 4px; }
 .hub-sub-meta-item .num { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--text); display: block; }
 .hub-sub-meta-item .label { font-size: 10.5px; color: var(--text-faint); }

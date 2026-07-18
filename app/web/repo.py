@@ -270,18 +270,34 @@ def create_payment(user_id: int, provider: str, external_id: str, plan: str, amo
         return cur.lastrowid
 
 
+def _plan_duration_days(plan_code: str) -> int | None:
+    row = _fetch_one("SELECT duration_days FROM plans WHERE code = ? ORDER BY created_at DESC LIMIT 1", (plan_code,))
+    return row["duration_days"] if row else None
+
+
 def mark_payment_paid(provider: str, external_id: str):
     """Возвращает user_id помеченного платежа (или None, если платёж с таким
     provider/external_id не найден) — раунд 8, модуль 2: вызывающий код
     (billing.py::cryptobot_webhook) использует его, чтобы подтвердить
-    реферальную запись приглашённого при его первой успешной оплате."""
+    реферальную запись приглашённого при его первой успешной оплате.
+
+    expires_at считается от момента оплаты на длительность тарифа
+    (plans.duration_days). NULL длительность = бессрочный/разовый тариф —
+    expires_at остаётся NULL, "активная подписка" для него не истекает."""
     with tx() as conn:
         row = conn.execute(
-            "UPDATE payments SET status = 'paid', paid_at = NOW() "
-            "WHERE provider = ? AND external_id = ? RETURNING user_id",
+            "SELECT plan FROM payments WHERE provider = ? AND external_id = ?",
             (provider, external_id),
         ).fetchone()
-        return row["user_id"] if row else None
+        duration_days = _plan_duration_days(row["plan"]) if row else None
+        expires_sql = "NOW() + (? * INTERVAL '1 day')" if duration_days else "NULL"
+        params = (duration_days,) if duration_days else ()
+        updated = conn.execute(
+            f"UPDATE payments SET status = 'paid', paid_at = NOW(), expires_at = {expires_sql} "
+            "WHERE provider = ? AND external_id = ? RETURNING user_id",
+            (*params, provider, external_id),
+        ).fetchone()
+        return updated["user_id"] if updated else None
 
 
 def mark_latest_pending_paid(provider: str, user_id: int, plan: str, external_id: str):
@@ -304,10 +320,13 @@ def mark_latest_pending_paid(provider: str, user_id: int, plan: str, external_id
         ).fetchone()
         if not row:
             return False
+        duration_days = _plan_duration_days(plan)
+        expires_sql = "NOW() + (? * INTERVAL '1 day')" if duration_days else "NULL"
+        expires_params = (duration_days,) if duration_days else ()
         conn.execute(
-            "UPDATE payments SET status = 'paid', paid_at = NOW(), external_id = ? "
+            f"UPDATE payments SET status = 'paid', paid_at = NOW(), external_id = ?, expires_at = {expires_sql} "
             "WHERE id = ?",
-            (external_id, row["id"]),
+            (external_id, *expires_params, row["id"]),
         )
         conn.execute(
             "UPDATE payments SET status = 'cancelled' WHERE provider = ? AND user_id = ? "
@@ -315,6 +334,21 @@ def mark_latest_pending_paid(provider: str, user_id: int, plan: str, external_id
             (provider, user_id, plan, row["id"]),
         )
         return True
+
+
+def get_active_subscription(user_id: int):
+    """Реальная проверка активной подписки — оплачена И (бессрочная, ИЛИ
+    ещё не истекла). В отличие от "платил хоть раз когда-либо" (старая
+    логика, см. историю чата), это честно отражает текущий доступ.
+    Берётся платёж с самым поздним expires_at среди подходящих (а не просто
+    последний по дате оплаты) — так продление/апгрейд тарифа корректно
+    отражается, даже если купили заранее, до истечения текущего."""
+    return _fetch_one(
+        "SELECT * FROM payments WHERE user_id = ? AND status = 'paid' "
+        "AND (expires_at IS NULL OR expires_at > NOW()) "
+        "ORDER BY (expires_at IS NULL) DESC, expires_at DESC NULLS LAST, paid_at DESC LIMIT 1",
+        (user_id,),
+    )
 
 
 def list_payments(user_id: int):
@@ -626,17 +660,22 @@ def list_plan_history(code: str | None = None):
     return _fetch_all("SELECT * FROM plans ORDER BY code ASC, created_at DESC")
 
 
-def set_plan_price(code: str, title: str, usd, stars: int):
+def set_plan_price(code: str, title: str, usd, stars: int, duration_days: int | None = None):
     """Меняет цену тарифа: деактивирует текущую активную запись для `code`
     (если она была) и вставляет новую активную — старая строка не
     удаляется и не перезаписывается, так вся история цен остаётся читаемой
     через list_plan_history(). Если тарифа с таким code ещё не было, эта же
-    функция его создаёт (первая запись для code сразу активна)."""
+    функция его создаёт (первая запись для code сразу активна).
+
+    duration_days — на сколько дней даёт доступ оплата этого тарифа (NULL =
+    бессрочно/разовая покупка). Применяется к НОВЫМ оплатам этого тарифа
+    (см. mark_payment_paid/mark_latest_pending_paid) — уже оплаченные
+    подписки не пересчитываются задним числом."""
     with tx() as conn:
         conn.execute("UPDATE plans SET is_active = FALSE WHERE code = ? AND is_active", (code,))
         cur = conn.execute(
-            "INSERT INTO plans (code, title, usd, stars, is_active) VALUES (?, ?, ?, ?, TRUE)",
-            (code, title, money.to_decimal(usd), stars),
+            "INSERT INTO plans (code, title, usd, stars, duration_days, is_active) VALUES (?, ?, ?, ?, ?, TRUE)",
+            (code, title, money.to_decimal(usd), stars, duration_days),
         )
         row = conn.execute("SELECT * FROM plans WHERE id = ?", (cur.lastrowid,)).fetchone()
         return row_to_dict(row)

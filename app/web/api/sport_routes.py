@@ -23,19 +23,17 @@ from app.web.integrations.sport_common import SportProviderError
 router = APIRouter(prefix="/api/sport", tags=["sport"])
 
 # Бесплатный показ ограничен, чтобы не отдавать полную сетку матчей без
-# подписки (см. чат — просьба владельца проекта). "PRO" здесь — та же самая
-# проверка, что и в личном кабинете (webapp/src/components/profile/
-# subscriptionCard.js): есть хотя бы один платёж со статусом paid. Отдельного
-# expires_at в схеме payments пока нет (см. комментарий там же), поэтому это
-# намеренно простая проверка "платил хоть раз", а не строгая проверка
-# активной подписки на сегодняшний день.
+# подписки (см. чат — просьба владельца проекта). "PRO" здесь — реальная
+# активная подписка (см. repo.get_active_subscription): оплачена И либо
+# бессрочна, либо срок ещё не истёк — та же проверка, что и в billing.py
+# (/api/billing/status -> subscription.active) и личном кабинете.
 FREE_MATCHES_LIMIT = 1
 
 
 def _has_paid(user: dict | None) -> bool:
     if not user:
         return False
-    return any(p["status"] == "paid" for p in repo.list_payments(user["id"]))
+    return repo.get_active_subscription(user["id"]) is not None
 
 
 @router.get("/status")

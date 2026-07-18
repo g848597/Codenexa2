@@ -24,6 +24,7 @@ def _shape(row: dict) -> dict:
         "usd": money.to_display(row["usd"], "USD"),
         "stars": row["stars"],
         "isActive": row["is_active"],
+        "durationDays": row.get("duration_days"),
         "createdAt": row["created_at"],
     }
 
@@ -46,6 +47,10 @@ class PlanBody(BaseModel):
     title: str
     usd: str
     stars: int
+    # Сколько дней даёт доступ этот тариф после оплаты. None/не передано =
+    # бессрочно (разовая покупка) — так и вели себя все тарифы ДО этого
+    # поля, поэтому None остаётся безопасным дефолтом, ничего не ломает.
+    durationDays: int | None = None
 
     @field_validator("title")
     @classmethod
@@ -59,6 +64,13 @@ class PlanBody(BaseModel):
     def _stars_positive(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("stars должно быть положительным числом")
+        return v
+
+    @field_validator("durationDays")
+    @classmethod
+    def _duration_positive(cls, v: int | None) -> int | None:
+        if v is not None and v <= 0:
+            raise ValueError("durationDays должно быть положительным числом или не задано (бессрочно)")
         return v
 
 
@@ -77,7 +89,7 @@ def set_plan_price(code: str, payload: PlanBody, request: Request, admin: dict =
         raise HTTPException(status_code=400, detail="usd должно быть положительным числом")
 
     previous = repo.get_active_plan(code)
-    updated = repo.set_plan_price(code, payload.title, usd_decimal, payload.stars)
+    updated = repo.set_plan_price(code, payload.title, usd_decimal, payload.stars, payload.durationDays)
     log_action(
         request,
         admin,

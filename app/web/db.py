@@ -295,6 +295,7 @@ CREATE TABLE IF NOT EXISTS payments (
     currency TEXT,
     status TEXT NOT NULL DEFAULT 'pending',
     idempotency_key TEXT,
+    expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     paid_at TIMESTAMPTZ
 );
@@ -362,6 +363,7 @@ CREATE TABLE IF NOT EXISTS plans (
     usd NUMERIC(20, 8) NOT NULL,
     stars INTEGER NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    duration_days INTEGER,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -422,6 +424,15 @@ _COLUMN_MIGRATIONS = (
     ("investors", "currency", "TEXT"),
     ("payments", "idempotency_key", "TEXT"),
     ("users", "email_verified", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    # Реальный срок действия подписки (было: "платил хоть раз" — см. чат,
+    # запрос владельца проекта на честную проверку активной подписки, а не
+    # факта оплаты когда-либо). duration_days на plans — сколько дней даёт
+    # тариф (NULL = бессрочно/разовая покупка); expires_at на payments —
+    # когда истекает КОНКРЕТНАЯ оплата, вычисляется в момент подтверждения
+    # оплаты (см. repo.py::_apply_expiry, mark_payment_paid,
+    # mark_latest_pending_paid).
+    ("plans", "duration_days", "INTEGER"),
+    ("payments", "expires_at", "TIMESTAMPTZ"),
 )
 
 

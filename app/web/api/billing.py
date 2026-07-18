@@ -30,6 +30,7 @@ def _format_plan(plan: dict) -> dict:
         "title": plan["title"],
         "usd": money.to_display(plan["usd"], "USD"),
         "stars": plan["stars"],
+        "durationDays": plan.get("duration_days"),
     }
 
 
@@ -54,7 +55,23 @@ def get_plans():
 def billing_status(user: dict = Depends(get_current_user)):
     payments = [_format_payment(p) for p in repo.list_payments(user["id"])]
     active_paid = [p for p in payments if p["status"] == "paid"]
-    return {"payments": payments, "hasPaid": bool(active_paid)}
+    # hasPaid оставлен для обратной совместимости (старая логика "платил
+    # хоть раз") — новый код должен смотреть на subscription.active, это
+    # честная проверка "доступ есть ПРЯМО СЕЙЧАС" (см. repo.get_active_subscription,
+    # чат: запрос владельца проекта на реальный срок действия подписки).
+    active_sub = repo.get_active_subscription(user["id"])
+    subscription = None
+    if active_sub:
+        subscription = {
+            "active": True,
+            "plan": active_sub["plan"],
+            "expiresAt": active_sub["expires_at"],  # None = бессрочный тариф
+        }
+    return {
+        "payments": payments,
+        "hasPaid": bool(active_paid),
+        "subscription": subscription or {"active": False, "plan": None, "expiresAt": None},
+    }
 
 
 @router.post("/checkout")

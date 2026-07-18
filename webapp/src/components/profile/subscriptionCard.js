@@ -1,28 +1,48 @@
 // "МОЯ ПОДПИСКА" — единая CodeNexa Premium, а не "AI Sport PRO"/"AI Docs
-// Premium" по отдельности (см. ТЗ). Бэкенд (app/web/api/billing.py) хранит
-// только лог платежей — нет полей "дата окончания"/"автопродление"/"промокод"
-// (см. app/web/repo.py — таблица plans/payments, без expires_at). Поэтому мы
-// показываем честно то, что реально можно посчитать: подтверждён ли хоть
-// один платёж (hasPaid) и с какой даты — а не выдумываем срок действия.
+// Premium" по отдельности (см. ТЗ). billing.subscription — честная проверка
+// РЕАЛЬНОГО срока действия (см. app/web/repo.py::get_active_subscription):
+// оплачена И (бессрочна ИЛИ ещё не истекла). Раньше здесь смотрели только на
+// "платил хоть раз когда-либо" (billing.hasPaid) — это осталось в ответе API
+// для обратной совместимости, но карточка теперь показывает настоящий статус.
 import { t } from '../../i18n.js';
 import { fmtDate } from '../../utils/format.js';
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 export function subscriptionCardHTML(billing, plans) {
   const payments = (billing && billing.payments) || [];
-  const hasPaid = !!(billing && billing.hasPaid);
+  const sub = (billing && billing.subscription) || { active: false, plan: null, expiresAt: null };
+  const isActive = !!sub.active;
   const paidPayments = payments.filter((p) => p.status === 'paid').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   const firstPaid = paidPayments[0];
-  const lastPaidPlanCode = paidPayments.length ? paidPayments[paidPayments.length - 1].plan : null;
   const planList = (plans && plans.plans) || [];
-  const lastPlan = planList.find((p) => p.code === lastPlanCodeMatch(lastPaidPlanCode, planList));
+  const activePlan = planList.find((p) => p.code === lastPlanCodeMatch(sub.plan, planList));
 
-  const planTitle = hasPaid ? (lastPlan ? lastPlan.title : t('hub_sub_paid_plan_fallback')) : t('hub_sub_free_plan');
+  const planTitle = isActive ? (activePlan ? activePlan.title : t('hub_sub_paid_plan_fallback')) : t('hub_sub_free_plan');
+
+  let badgeText = t('hub_sub_inactive');
+  let badgeClass = 'inactive';
+  if (isActive) {
+    if (!sub.expiresAt) {
+      badgeText = t('hub_sub_lifetime');
+      badgeClass = 'active';
+    } else {
+      const daysLeft = Math.max(0, Math.ceil((new Date(sub.expiresAt).getTime() - Date.now()) / MS_PER_DAY));
+      badgeText = `${t('hub_sub_expires_in')} ${daysLeft} ${t('hub_sub_days')}`;
+      badgeClass = daysLeft <= 3 ? 'warning' : 'active';
+    }
+  } else if (paidPayments.length) {
+    // Были оплаты, но срок вышел — отличаем от "вообще никогда не платил",
+    // чтобы не выглядело так, будто человек ничего не покупал.
+    badgeText = t('hub_sub_expired');
+    badgeClass = 'expired';
+  }
 
   return `
-  <div class="hub-sub-card ${hasPaid ? 'is-premium' : ''}">
+  <div class="hub-sub-card ${isActive ? 'is-premium' : ''}">
     <div class="hub-sub-top">
       <div class="hub-sub-plan">${planTitle}</div>
-      <span class="hub-sub-badge ${hasPaid ? 'active' : 'inactive'}">${hasPaid ? t('hub_sub_active') : t('hub_sub_inactive')}</span>
+      <span class="hub-sub-badge ${badgeClass}">${badgeText}</span>
     </div>
     <div class="hub-sub-meta">
       <div class="hub-sub-meta-item">
@@ -34,9 +54,9 @@ export function subscriptionCardHTML(billing, plans) {
         <span class="label">${t('hub_sub_payments_count')}</span>
       </div>
     </div>
-    ${!hasPaid ? `<p class="hub-empty-note" style="margin-top:10px;">${t('hub_sub_upsell')}</p>` : ''}
-    <button class="hub-sub-manage-btn ${hasPaid ? '' : 'primary'}" data-hub-manage-sub type="button">
-      ${hasPaid ? t('hub_sub_manage_btn') : t('hub_sub_view_plans_btn')}
+    ${!isActive ? `<p class="hub-empty-note" style="margin-top:10px;">${t('hub_sub_upsell')}</p>` : ''}
+    <button class="hub-sub-manage-btn ${isActive ? '' : 'primary'}" data-hub-manage-sub type="button">
+      ${isActive ? t('hub_sub_manage_btn') : t('hub_sub_view_plans_btn')}
     </button>
   </div>`;
 }
