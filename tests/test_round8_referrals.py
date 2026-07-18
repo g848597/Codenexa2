@@ -12,10 +12,14 @@ from app.web import repo
 from app.web.config import settings
 
 
-def _sign_init_data(user: dict, start_param: str | None = None, bot_token: str = "test") -> str:
-    """Строит валидную initData той же схемой, что и validate_init_data()
-    в app/web/api/telegram_auth.py — тестовое окружение задаёт
-    TELEGRAM_BOT_TOKEN=test (см. conftest.py/pytest env)."""
+def _sign_init_data(user: dict, start_param: str | None = None, bot_token: str | None = None) -> str:
+    """... см. подпись initData в app/web/api/telegram_auth.py. Токен по
+    умолчанию берётся из settings.TELEGRAM_BOT_TOKEN (conftest.py задаёт
+    "test-bot-token") — раньше здесь был захардкожен другой дефолт ("test"),
+    из-за чего подпись не совпадала с той, что реально проверяет
+    validate_init_data(), и все тесты в этом файле падали с 401 независимо
+    от логики реферальной программы."""
+    bot_token = bot_token or settings.TELEGRAM_BOT_TOKEN
     pairs = {"user": json.dumps(user), "auth_date": "9999999999"}
     if start_param:
         pairs["start_param"] = start_param

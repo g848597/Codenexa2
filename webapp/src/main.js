@@ -5,7 +5,7 @@
 // Порядок: телеметрия/Telegram SDK -> проверка сессии (или карточка входа) ->
 // онбординг (если ещё не пройден) -> сборка дашборда из уже готовых секций.
 
-import { initTelegram, isInsideTelegram } from './telegram.js';
+import { initTelegram, isInsideTelegram, getStartParam, showAlert } from './telegram.js';
 import { initMonitoring, captureException } from './monitoring.js';
 import { getLang, toggleLang, t } from './i18n.js';
 
@@ -110,6 +110,36 @@ function startApp() {
     renderDashboardSections();
   } else {
     mountOnboarding(document.getElementById('onboarding-root'), renderDashboardSections);
+  }
+
+  handleOrgInviteDeepLink();
+}
+
+// Ссылка-приглашение в организацию (см. profile/organizationSection.js —
+// формат "startapp=org_invite_<token>"): принимаем приглашение сразу после
+// входа и открываем HUB на экране "Организация", чтобы сотрудник увидел
+// результат, а не потерялся на дашборде.
+async function handleOrgInviteDeepLink() {
+  const startParam = getStartParam();
+  if (!startParam || !startParam.startsWith('org_invite_')) return;
+  const token = startParam.slice('org_invite_'.length);
+  if (!token) return;
+
+  // Telegram отдаёт start_param на весь сеанс, а не только на первый запуск
+  // по ссылке — без этой защиты повторное открытие мини-аппа снова и снова
+  // дёргало бы /accept и показывало алерт "приглашение уже использовано".
+  const handledKey = `codenexa_org_invite_handled:${token}`;
+  try {
+    if (sessionStorage.getItem(handledKey)) return;
+    sessionStorage.setItem(handledKey, '1');
+  } catch { /* sessionStorage недоступен — в худшем случае одна лишняя попытка */ }
+
+  try {
+    await authApi.acceptOrgInvite(token);
+    openAccountApp(handleLoggedOut, { initialScreen: 'organization' });
+    showAlert('Вы присоединились к организации!');
+  } catch (e) {
+    showAlert(e.message || 'Приглашение недействительно или уже использовано');
   }
 }
 

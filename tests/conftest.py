@@ -46,7 +46,15 @@ def _clean_db(_app):
     """Чистим таблицы, которые трогают тесты, перед КАЖДЫМ тестом — тесты не
     должны зависеть от порядка выполнения друг друга."""
     conn = get_conn()
-    for table in ("admin_audit_log", "referrals", "investors", "payments", "oauth_links", "sessions", "users", "plans"):
+    for table in (
+        "admin_audit_log", "referrals", "investors", "payments", "auth_otp_codes", "oauth_links", "sessions",
+        # Организации ссылаются на users.id БЕЗ ON DELETE CASCADE
+        # (organizations.owner_user_id) — должны быть очищены до "users",
+        # иначе DELETE FROM users падает по внешнему ключу. document_templates
+        # и documents каскадируются от organizations, отдельно чистить не нужно.
+        "organization_invites", "organization_members", "organizations",
+        "users", "plans",
+    ):
         conn.execute(f"DELETE FROM {table}")
     # `plans` — не пустая по умолчанию (см. db.py::_seed_default_plans),
     # поэтому после очистки её нужно пересеять, иначе test-раны, повторно
