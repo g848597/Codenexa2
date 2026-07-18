@@ -2,16 +2,18 @@
 в цепочке AI Sport (см. sport_provider.py), подключается автоматически, когда
 footballdata.io исчерпал лимит или недоступен.
 
-ВАЖНО про надёжность этого файла: у ClearSports в открытом доступе
-задокументирован только пример для NBA (`/v1/nba/games?date=today`,
-поля home_team/away_team/status/venue). Публичной документации по разделу
-Soccer на момент написания найти не удалось (сайт не отдаёт её ботам) —
-поэтому пути ниже (`/v1/soccer/...`) выбраны по аналогии с NBA-примером, а
-не проверены напрямую. Если реальные пути/поля отличаются, этот провайдер
-будет просто падать с ошибкой на каждый вызов — sport_provider.py в этом
-случае продолжит использовать footballdata.io (если тот ещё не исчерпал
-лимит) и ни на что не повлияет для пользователя. Если увидите в логах
-Railway ошибки от clearsports.py — пришлите их, поправим пути/поля по факту.
+ОБНОВЛЕНО 2026-07-18: реальная документация — https://www.clearsportsapi.com/docs.
+У ClearSports НЕТ общего эндпоинта "/soccer/...": соккер разбит по лигам —
+/api/v1/epl/teams, /api/v1/laliga/teams, /api/v1/bundesliga/teams,
+/api/v1/seriea/teams, /api/v1/ligue1/teams и т.д. (полный список: epl, laliga,
+bundesliga, mls, ligue1, ligaportugal, uefa, eredivisie, seriea, ligamx,
+brazilian-serie-a, world-cup). Эндпоинт /games НЕ принимает фильтр по
+team_id ("returns the full set and does not accept filter parameters") — его
+приходится тянуть целиком и фильтровать на нашей стороне.
+
+Прошлая версия этого файла била в несуществующий путь "/soccer/teams" —
+угаданный по аналогии с NBA-примером, а не проверенный по докам — поэтому
+провайдер падал с 404 на каждый вызов.
 """
 import asyncio
 import time
@@ -20,6 +22,10 @@ import httpx
 
 from app.web.config import settings
 from app.web.integrations.sport_common import SportProviderError, first
+
+# Топ-5 лиг — держим тот же охват, что и у footballdata.io (5 лиг на бесплатном
+# тарифе), чтобы оба источника были сопоставимы по объёму данных.
+_LEAGUES = ["epl", "laliga", "bundesliga", "seriea", "ligue1"]
 
 _cache: dict[str, tuple[float, dict]] = {}
 
@@ -61,7 +67,7 @@ async def _get(path: str, params: dict | None = None, cache_key: str | None = No
                     f"{settings.CLEARSPORTS_BASE_URL}{path}", headers=headers, params=params or {}
                 )
             if res.status_code in (401, 403):
-                raise SportProviderError("clearsportsapi.com отклонил ключ (401/403)", 502)
+                raise SportProviderError("clearsportsapi.com отклонил ключ или закончились credits (401/403)", 502)
             if res.status_code == 429:
                 raise SportProviderError("clearsportsapi.com: превышен лимит запросов", 429, rate_limited=True)
             res.raise_for_status()
@@ -90,11 +96,11 @@ async def _get(path: str, params: dict | None = None, cache_key: str | None = No
     raise SportProviderError(f"Не удалось связаться с clearsportsapi.com: {last_err}", 502, rate_limited=True)
 
 
-def _map_team(raw: dict) -> dict:
+def _map_team(raw: dict, league: str | None = None) -> dict:
     venue = raw.get("venue")
     venue_dict = venue if isinstance(venue, dict) else ({"name": venue} if isinstance(venue, str) else {})
     return {
-        "id": first(raw, "id", "team_id"),
+        "id": first(raw, "id", "team_id", default=f"{league}_?" if league else None),
         "name": first(raw, "name", "team_name", default="?"),
         "country": first(raw, "country"),
         "logo": first(raw, "logo", "logo_url"),
@@ -144,38 +150,89 @@ def _map_fixture(raw: dict) -> dict:
     }
 
 
+def _league_of(team_id: str) -> str | None:
+    """ClearSports ID команд — с префиксом лиги, например 'epl_ars'
+    (см. примеры в доках: team_id=epl_ars, nfl_ari). Достаём лигу из префикса,
+    чтобы обратиться сразу к нужному эндпоинту, а не перебирать все подряд."""
+    if not team_id:
+        return None
+    prefix = team_id.split("_", 1)[0]
+    return prefix if prefix in _LEAGUES else None
+
+
 async def popular_teams() -> list[dict]:
-    data = await _get("/soccer/teams", cache_key="cs_teams")
-    raw_teams = data.get("data") or data.get("teams") or []
-    return [_map_team(t) for t in raw_teams[:18] if isinstance(t, dict)]
+    teams: list[dict] = []
+    for league in _LEAGUES:
+        try:
+            data = await _get(f"/{league}/teams", cache_key=f"cs_teams:{league}")
+        except SportProviderError:
+            continue
+        raw_teams = data.get("data") or data.get("teams") or []
+        if isinstance(raw_teams, list):
+            teams.extend(_map_team(t, league) for t in raw_teams[:6] if isinstance(t, dict))
+        if len(teams) >= 18:
+            break
+    return teams[:18]
 
 
 async def search_teams(query: str) -> list[dict]:
-    # Явного поиска по названию в примерах ClearSports не встречалось —
-    # берём общий список и фильтруем по подстроке на нашей стороне.
-    data = await _get("/soccer/teams", cache_key="cs_teams")
-    raw_teams = data.get("data") or data.get("teams") or []
     q = query.strip().lower()
-    matched = [t for t in raw_teams if isinstance(t, dict) and q in str(first(t, "name", "team_name", default="")).lower()]
-    return [_map_team(t) for t in matched[:20]]
+    matched: list[dict] = []
+    for league in _LEAGUES:
+        try:
+            data = await _get(f"/{league}/teams", cache_key=f"cs_teams:{league}")
+        except SportProviderError:
+            continue
+        raw_teams = data.get("data") or data.get("teams") or []
+        if not isinstance(raw_teams, list):
+            continue
+        for t in raw_teams:
+            if isinstance(t, dict) and q in str(first(t, "name", "team_name", default="")).lower():
+                matched.append(_map_team(t, league))
+        if len(matched) >= 20:
+            break
+    return matched[:20]
 
 
 async def team_detail(team_id: str) -> dict:
-    data = await _get(f"/soccer/teams/{team_id}", cache_key=f"cs_team:{team_id}")
+    league = _league_of(team_id) or _LEAGUES[0]
+    data = await _get(f"/{league}/teams/{team_id}", cache_key=f"cs_team:{team_id}")
     raw = data.get("data") if isinstance(data.get("data"), dict) else data.get("team") if isinstance(data.get("team"), dict) else data
-    return _map_team(raw)
+    return _map_team(raw, league)
 
 
 async def team_matches(team_id: str) -> dict:
-    data = await _get("/soccer/games", params={"team_id": team_id}, cache_key=f"cs_team_matches:{team_id}")
+    # /games не принимает фильтр по team_id ("returns the full set") — тянем
+    # весь список игр лиги команды и фильтруем сами.
+    league = _league_of(team_id) or _LEAGUES[0]
+    data = await _get(f"/{league}/games", cache_key=f"cs_games:{league}")
     raw_matches = data.get("data") or data.get("games") or []
-    mapped = [_map_fixture(m) for m in raw_matches if isinstance(m, dict)]
+    if not isinstance(raw_matches, list):
+        raw_matches = []
+    own = [
+        m for m in raw_matches
+        if isinstance(m, dict) and team_id in (
+            first(m.get("home_team") or {}, "id", "team_id"),
+            first(m.get("away_team") or {}, "id", "team_id"),
+        )
+    ]
+    mapped = [_map_fixture(m) for m in own]
     recent = [m for m in mapped if m["statusShort"] == "FT"][-5:]
     upcoming = [m for m in mapped if m["statusShort"] == "NS"][:5]
     return {"recent": recent, "upcoming": upcoming}
 
 
 async def live_matches() -> list[dict]:
-    data = await _get("/soccer/games", params={"status": "live"})
-    raw_matches = data.get("data") or data.get("games") or []
-    return [_map_fixture(m) for m in raw_matches if isinstance(m, dict)]
+    live: list[dict] = []
+    for league in _LEAGUES:
+        try:
+            data = await _get(f"/{league}/games", cache_key=f"cs_games:{league}")
+        except SportProviderError:
+            continue
+        raw_matches = data.get("data") or data.get("games") or []
+        if not isinstance(raw_matches, list):
+            continue
+        for m in raw_matches:
+            if isinstance(m, dict) and str(first(m, "status", default="")).strip().lower() in ("live", "in_progress"):
+                live.append(_map_fixture(m))
+    return live

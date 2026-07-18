@@ -32,8 +32,12 @@ async def teams_popular():
         return {"teams": []}
     try:
         teams = await sport.popular_teams()
-    except SportProviderError as e:
-        raise HTTPException(status_code=e.status, detail=str(e))
+    except SportProviderError:
+        # Все источники отказали (лимит/ключ/сбой) — не роняем весь раздел
+        # 502-м на всю страницу, отдаём честно пустой список. Фронтенд уже
+        # умеет показывать sa-hint-block для пустого teams (как и при
+        # apiConfigured === false), так что это не выглядит поломкой.
+        return {"teams": [], "degraded": True}
     return {"teams": teams}
 
 
@@ -76,6 +80,6 @@ async def live():
         return {"matches": [], "configured": False}
     try:
         matches = await sport.live_matches()
-    except SportProviderError as e:
-        raise HTTPException(status_code=e.status, detail=str(e))
+    except SportProviderError:
+        return {"matches": [], "configured": True, "degraded": True}
     return {"matches": matches, "configured": True}
