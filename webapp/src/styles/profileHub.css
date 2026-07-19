@@ -19,14 +19,18 @@
 
 /* ---------------------------- Header ---------------------------------- */
 
-.hub-header { position: relative; padding: 22px 18px; margin-bottom: 22px; border-radius: var(--radius-lg); border: var(--border-glass); background: var(--gradient-surface), var(--bg-card); overflow: hidden; }
+.hub-header { position: relative; padding: 28px 22px; margin-bottom: 24px; border-radius: var(--radius-lg); border: var(--border-glass); background: var(--gradient-surface), var(--bg-card); overflow: hidden; box-shadow: var(--shadow-card, 0 18px 44px -26px rgba(0,0,0,0.55)); }
 .hub-header::before {
-  content: ''; position: absolute; inset: -40% -20% auto auto; width: 220px; height: 220px;
-  background: radial-gradient(circle, rgba(0,217,160,.22), transparent 70%); pointer-events: none;
+  content: ''; position: absolute; inset: -40% -20% auto auto; width: 260px; height: 260px;
+  background: radial-gradient(circle, rgba(0,217,160,.24), transparent 70%); pointer-events: none;
 }
-.hub-header-row { display: flex; align-items: center; gap: 16px; position: relative; z-index: 1; }
+.hub-header::after {
+  content: ''; position: absolute; inset: auto auto -50% -10%; width: 220px; height: 220px;
+  background: radial-gradient(circle, rgba(143,123,255,.14), transparent 70%); pointer-events: none;
+}
+.hub-header-row { display: flex; align-items: center; gap: 18px; position: relative; z-index: 1; }
 .hub-avatar-ring {
-  position: relative; width: 68px; height: 68px; flex: none; border-radius: 50%;
+  position: relative; width: 80px; height: 80px; flex: none; border-radius: 50%;
   padding: 3px; background: conic-gradient(from 0deg, var(--ledger), var(--steel), var(--violet), var(--ledger));
   animation: hubRingSpin 6s linear infinite;
 }
@@ -34,20 +38,20 @@
 @keyframes hubRingSpin { to { transform: rotate(360deg); } }
 .hub-avatar {
   width: 100%; height: 100%; border-radius: 50%; background: var(--bg-elevated); display: flex; align-items: center;
-  justify-content: center; font-family: var(--font-display); font-size: 24px; font-weight: 600; color: var(--text);
+  justify-content: center; font-family: var(--font-display); font-size: 28px; font-weight: 600; color: var(--text);
   overflow: hidden; border: 2px solid var(--bg-card);
 }
 .hub-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .hub-id { min-width: 0; flex: 1; }
-.hub-name { font-family: var(--font-display); font-size: 19px; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hub-handle { font-size: 12px; color: var(--text-dim); margin-top: 2px; font-family: var(--font-mono); }
-.hub-tier { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; padding: 4px 10px 4px 8px; border-radius: 12px; margin-top: 8px; letter-spacing: .02em; }
+.hub-name { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.2px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-handle { font-size: 12.5px; color: var(--text-dim); margin-top: 3px; font-family: var(--font-mono); }
+.hub-tier { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; padding: 5px 11px 5px 9px; border-radius: 12px; margin-top: 10px; letter-spacing: .02em; }
 .hub-tier svg { width: 12px; height: 12px; }
 .hub-tier.tier-member { background: var(--bg-elevated); color: var(--text-dim); border: 1px solid var(--line-strong); }
 .hub-tier.tier-premium { background: var(--gradient-ledger); color: var(--on-ledger); box-shadow: var(--glow-ledger); }
 .hub-tier.tier-founder { background: var(--gradient-violet, linear-gradient(135deg,#a996ff,var(--violet))); color: #fff; box-shadow: var(--glow-violet); }
 .hub-edit-btn {
-  flex: none; font-size: 12.5px; font-weight: 600; padding: 9px 14px; border-radius: var(--radius-sm);
+  flex: none; font-size: 12.5px; font-weight: 600; padding: 10px 15px; border-radius: var(--radius-sm);
   border: 1px solid var(--line-strong); background: rgba(255,255,255,0.03); color: var(--text); cursor: pointer;
   transition: border-color .2s var(--ease), background .2s var(--ease); align-self: flex-start;
 }
@@ -233,16 +237,17 @@
    accountApp.js) — home-экран показывает шапку + список папок-разделов,
    каждый раздел открывается отдельным экраном с кнопкой "Назад" к меню. */
 
-.hub-menu-hint { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .05em; margin: 22px 0 8px 2px; }
-.hub-menu-row { display: flex; align-items: center; gap: 12px; padding: 14px; border-bottom: 1px solid var(--line); cursor: pointer; background: none; width: 100%; text-align: left; color: var(--text); }
+.hub-menu-hint { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; margin: 26px 0 10px 2px; }
+.hub-row-list { border-radius: var(--radius-lg); border: var(--border-glass); background: var(--bg-card); overflow: hidden; box-shadow: var(--shadow-card, 0 14px 34px -26px rgba(0,0,0,0.5)); }
+.hub-menu-row { display: flex; align-items: center; gap: 14px; padding: 16px; border-bottom: 1px solid var(--line); cursor: pointer; background: none; width: 100%; text-align: left; color: var(--text); transition: background .2s var(--ease); }
 .hub-menu-row:last-child { border-bottom: none; }
-.hub-menu-row:hover { background: rgba(255,255,255,.03); }
-.hub-menu-icon { flex: none; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--bg-card); color: var(--ledger); border: 1px solid var(--line); }
-.hub-menu-icon svg { width: 18px; height: 18px; }
+.hub-menu-row:hover { background: rgba(255,255,255,.035); }
+.hub-menu-icon { flex: none; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--gradient-surface), var(--bg-elevated); color: var(--ledger); border: 1px solid var(--line); }
+.hub-menu-icon svg { width: 20px; height: 20px; }
 .hub-menu-main { flex: 1; min-width: 0; }
-.hub-menu-title { font-family: var(--font-display); font-size: 14px; font-weight: 600; }
-.hub-menu-sub { font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
-.hub-menu-value { flex: none; font-size: 11.5px; color: var(--text-dim); font-family: var(--font-mono); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-menu-title { font-family: var(--font-display); font-size: 14.5px; font-weight: 600; }
+.hub-menu-sub { font-size: 11.5px; color: var(--text-faint); margin-top: 3px; }
+.hub-menu-value { flex: none; font-size: 11.5px; color: var(--text-dim); font-family: var(--font-mono); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 9px; background: var(--bg-elevated); border-radius: 8px; }
 .hub-menu-chevron { flex: none; color: var(--text-faint); }
 .hub-menu-chevron svg { width: 14px; height: 14px; transform: rotate(180deg); }
 

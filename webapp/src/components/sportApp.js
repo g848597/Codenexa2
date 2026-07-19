@@ -11,6 +11,7 @@ import { captureReturnTarget, getReturnTarget, reopenProductIfNeeded } from '../
 import { esc } from '../utils/html.js';
 import { icon } from '../utils/icons.js';
 import { backButtonHTML as _backButtonHTML, errorHTML as _errorHTML, loadingHTML as _loadingHTML } from '../utils/loadingState.js';
+import { showPlanCheckout } from './planCheckoutModal.js';
 
 let root = null;
 let screenStack = [{ name: 'home' }];
@@ -142,6 +143,44 @@ function predictionChipHTML(f) {
   return '';
 }
 
+// Строка "лига · время" над карточкой — данные из f.league (см.
+// footballdata.py: _map_league_ref), появились вместе с исправлением
+// эндпоинта /matches/date/{date}. Раньше поля league в fixture вообще не
+// было, поэтому в списке матчей нельзя было понять, из какого чемпионата
+// каждая строка — особенно заметно, когда день показывает сразу 5 лиг подряд.
+function fixtureMetaHTML(f) {
+  const bits = [];
+  if (f.league && f.league.name) bits.push(esc(f.league.name));
+  if (f.timestamp && f.statusShort === 'NS') {
+    const d = new Date(f.timestamp * 1000);
+    bits.push(d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }));
+  }
+  if (!bits.length) return '';
+  return `<div class="sa-fixture-meta">${bits.join(' <span class="sa-fixture-meta-dot">·</span> ')}</div>`;
+}
+
+// Реальные коэффициенты букмекеров (f.odds — П1/Х/П2, см. footballdata.py:
+// _map_odds), когда источник их отдаёт для предстоящего матча. Это НЕ то же
+// самое, что прогноз ИИ (predictionChipHTML) — коэффициенты показываются
+// отдельной строкой с явной подписью "Коэффициенты", чтобы два разных вида
+// чисел (рыночная цена букмекера vs модель по форме команд) не сливались
+// в один блок и не выглядели как один и тот же прогноз, посчитанный дважды.
+function oddsStripHTML(f) {
+  if (f.statusShort !== 'NS' || !f.odds) return '';
+  const { home, draw, away } = f.odds;
+  if (home == null && draw == null && away == null) return '';
+  const cell = (label, val) => `<div class="sa-odds-cell"><span class="sa-odds-label">${label}</span><span class="sa-odds-val">${val != null ? Number(val).toFixed(2) : '—'}</span></div>`;
+  return `
+  <div class="sa-odds-strip">
+    <span class="sa-odds-title">${icon('scale')}<span>Коэффициенты</span></span>
+    <div class="sa-odds-cells">
+      ${cell('П1', home)}
+      ${cell('X', draw)}
+      ${cell('П2', away)}
+    </div>
+  </div>`;
+}
+
 function fixtureRowHTML(f) {
   const cls = matchStatusClass(f);
   // Раньше вся строка была одной <button> с data-team жёстко на f.home.id —
@@ -151,13 +190,14 @@ function fixtureRowHTML(f) {
   // гости — две отдельные кнопки, каждая ведёт на свою команду.
   return `
   <div class="sa-fixture sa-fixture-${cls}">
-    <div class="sa-fixture-status">${statusBadge(f)}</div>
+    <div class="sa-fixture-status">${statusBadge(f)}${fixtureMetaHTML(f)}</div>
     <div class="sa-fixture-main">
       <button class="sa-fixture-team" data-team="${f.home.id ?? ''}">${crestHTML(f.home, 'md')}<span class="sa-fixture-team-name">${esc(f.home.name)}</span></button>
       <div class="sa-fixture-score-block">${scoreOrTimeHTML(f)}</div>
       <button class="sa-fixture-team sa-fixture-team-away" data-team="${f.away.id ?? ''}"><span class="sa-fixture-team-name">${esc(f.away.name)}</span>${crestHTML(f.away, 'md')}</button>
     </div>
     ${predictionChipHTML(f)}
+    ${oddsStripHTML(f)}
   </div>`;
 }
 
@@ -267,6 +307,22 @@ function wireCommon() {
       push('team', { id });
     });
   });
+
+  // Тарифы и оплата — мини-окно поверх текущего экрана (см.
+  // components/planCheckoutModal.js), а не переход на вкладку "Аккаунт".
+  // В wireCommon(), а не только в wireHome(), т.к. кнопка "PRO" в шапке и
+  // залоченные чипы прогнозов встречаются и на экранах команды/live-табло.
+  // Оплата идёт через тот же authApi.checkout(), которым пользуется личный
+  // кабинет — тарифы/цены общие для всей экосистемы CodeNexa, здесь только
+  // другая точка входа в тот же биллинг.
+  root.querySelectorAll('[data-plan-code]').forEach((btn) => btn.addEventListener('click', () => {
+    haptic('light');
+    openSportPlanCheckout(btn.dataset.planCode);
+  }));
+  root.querySelectorAll('[data-open-pro]').forEach((btn) => btn.addEventListener('click', () => {
+    haptic('light');
+    openSportPlanCheckout(null);
+  }));
 }
 
 // =========================================================================
@@ -393,7 +449,7 @@ function renderHome() {
       const isCurrent = tierState.loaded && t === tierState.tier;
       const isFeatured = p.code === recommendedCode && !isCurrent;
       return `
-      <button class="sa-plan-card ${isFeatured ? 'sa-plan-featured' : ''} ${isCurrent ? 'sa-plan-current' : ''}" data-open-pro>
+      <button class="sa-plan-card ${isFeatured ? 'sa-plan-featured' : ''} ${isCurrent ? 'sa-plan-current' : ''}" data-plan-code="${esc(p.code)}">
         <span class="sa-plan-title">${esc(p.title)}</span>
         <span class="sa-plan-price">$${esc(p.usd)}<em>/ ${esc(String(p.stars))} ${icon('star')}</em></span>
         ${TIER_QUOTA[t] ? `<span class="sa-plan-quota">${TIER_QUOTA[t]}</span>` : ''}
@@ -548,14 +604,24 @@ function wireHome() {
     if (!dayMatches.revealed || day !== dayMatches.day) loadDayMatches(day);
   }));
 
-  // Реальные тарифы/оплата уже реализованы в личном кабинете (см.
-  // accountApp.js, billingHTML() — там же настоящие цены и checkout) —
-  // здесь просто переводим на ту же вкладку, а не дублируем логику оплаты.
-  root.querySelectorAll('[data-open-pro]').forEach((btn) => btn.addEventListener('click', () => {
-    haptic('light');
+}
+
+function openSportPlanCheckout(planCode) {
+  const plans = plansState.plans || [];
+  if (!plans.length) {
+    // Тарифы ещё не загрузились (или бэкенд их не отдал) — самое честное
+    // здесь — отправить туда, где точно есть актуальный список, а не
+    // показывать пустое мини-окно.
     closeSportApp();
     document.querySelector('.tab[data-view="account"]')?.click();
-  }));
+    return;
+  }
+  showPlanCheckout({
+    plans,
+    planCode: planCode || undefined,
+    checkout: (code, method, network) => authApi.checkout(code, method, network, crypto.randomUUID()),
+    onSuccess: () => { sportApi.tier().then((tierData) => { if (tierData) { tierState = { loaded: true, tier: tierData.tier, tierTitle: tierData.tierTitle, daysUnlocked: tierData.daysUnlocked, predMin: tierData.predMin, predMax: tierData.predMax }; render(); } }).catch(() => {}); },
+  });
 }
 
 // =========================================================================

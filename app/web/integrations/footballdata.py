@@ -110,7 +110,7 @@ def _map_team(raw: dict) -> dict:
         "id": _first(raw, "id", "team_id"),
         "name": _first(raw, "name", "team_name", default="?"),
         "country": _first(raw, "country", "country_name"),
-        "logo": _first(raw, "logo", "logo_url", "crest", "crest_url"),
+        "logo": _first(raw, "logo", "team_logo", "logo_url", "crest", "crest_url"),
         "founded": _first(raw, "founded", "founded_year"),
         "venue": _map_venue(venue),
     }
@@ -120,7 +120,9 @@ def _map_team_ref(raw: dict) -> dict:
     return {
         "id": _first(raw, "id", "team_id"),
         "name": _first(raw, "name", "team_name", default="?"),
-        "logo": _first(raw, "logo", "logo_url", "crest", "crest_url"),
+        # "team_logo" — реальное имя поля у home_team/away_team в ответах
+        # /matches* (см. пример в документации); без него отсутствовал.
+        "logo": _first(raw, "logo", "team_logo", "logo_url", "crest", "crest_url"),
     }
 
 
@@ -137,6 +139,38 @@ _STATUS_MAP = {
 }
 
 
+def _map_league_ref(raw) -> dict:
+    if not isinstance(raw, dict) or not raw:
+        return {}
+    return {
+        "id": _first(raw, "league_id", "id"),
+        "name": _first(raw, "name", "competition_name"),
+        "country": _first(raw, "country"),
+    }
+
+
+def _map_odds(raw) -> dict | None:
+    if not isinstance(raw, dict) or not raw:
+        return None
+    home = _first(raw, "home_win", "home")
+    draw = _first(raw, "draw")
+    away = _first(raw, "away_win", "away")
+    if home is None and draw is None and away is None:
+        return None
+    return {"home": home, "draw": draw, "away": away}
+
+
+def _map_probabilities(raw) -> dict | None:
+    if not isinstance(raw, dict) or not raw:
+        return None
+    home = _first(raw, "home_win", "home")
+    draw = _first(raw, "draw")
+    away = _first(raw, "away_win", "away")
+    if home is None and draw is None and away is None:
+        return None
+    return {"home": home, "draw": draw, "away": away}
+
+
 def _map_fixture(raw: dict) -> dict:
     home = raw.get("home_team") or raw.get("home") or {}
     away = raw.get("away_team") or raw.get("away") or {}
@@ -148,9 +182,16 @@ def _map_fixture(raw: dict) -> dict:
     return {
         "statusShort": status_short,
         "elapsed": _first(raw, "elapsed", "minute"),
-        "timestamp": _first(raw, "timestamp", "kickoff_timestamp", "start_timestamp"),
+        # "date_unix" — реальное имя поля у footballdata.io (см. пример ответа
+        # в документации /matches и /fixtures); раньше его не было среди
+        # кандидатов, поэтому время начала матча почти всегда уходило пустым.
+        "timestamp": _first(raw, "date_unix", "timestamp", "kickoff_timestamp", "start_timestamp"),
+        "matchDate": _first(raw, "match_date"),
         "goalsHome": goals_home,
         "goalsAway": goals_away,
+        "league": _map_league_ref(raw.get("league")),
+        "odds": _map_odds(raw.get("odds")),
+        "probabilities": _map_probabilities(raw.get("probabilities")),
         "home": _with_winner(_map_team_ref(home if isinstance(home, dict) else {}), goals_home, goals_away, status_short),
         "away": _with_winner(_map_team_ref(away if isinstance(away, dict) else {}), goals_away, goals_home, status_short),
     }
@@ -206,7 +247,23 @@ async def live_matches() -> list[dict]:
 
 
 async def matches_by_date(date_str: str) -> list[dict]:
-    """date_str в формате YYYY-MM-DD (см. документацию: /fixtures?date=)."""
-    data = await _get("/fixtures", params={"date": date_str}, cache_key=f"fixtures:{date_str}")
-    raw_matches = data.get("data") or data.get("matches") or []
+    """date_str в формате YYYY-MM-DD.
+
+    ИСПРАВЛЕНО: раньше здесь стоял путь "/fixtures?date=" — такого эндпоинта
+    у footballdata.io попросту нет (см. официальный реестр эндпоинтов:
+    https://footballdata.io/documentation/endpoints/ и
+    https://footballdata.io/documentation/matches/). Правильный путь для
+    "матчи на дату" — GET /matches/date/{date}, дата передаётся частью пути,
+    а не query-параметром. Из-за неверного пути footballdata.io отвечал
+    ошибкой на КАЖДЫЙ запрос вкладки дня, sport_provider.py уходил в
+    clearsports (который тоже был сломан — см. clearsports.py), и раздел
+    "AI Sport" оставался без единого матча независимо от тарифа."""
+    data = await _get(f"/matches/date/{date_str}", cache_key=f"matches_date:{date_str}")
+    raw = data.get("data")
+    if isinstance(raw, dict):
+        raw_matches = raw.get("matches") or []
+    elif isinstance(raw, list):
+        raw_matches = raw
+    else:
+        raw_matches = data.get("matches") or []
     return [_map_fixture(m) for m in raw_matches if isinstance(m, dict)]

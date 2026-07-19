@@ -242,13 +242,28 @@ async def live_matches() -> list[dict]:
 
 
 async def matches_by_date(date_str: str) -> list[dict]:
+    """ИСПРАВЛЕНО: /{league}/games у ClearSports "returns the full set and
+    does not accept filter parameters" (см. официальные доки —
+    https://www.clearsportsapi.com/docs) — раньше сюда передавался
+    params={"date": date_str}, который API молча игнорировал, и день
+    фактически не фильтровался вовсе (либо, при другом сбое, кэш-ключ с
+    датой создавал видимость фильтрации, но данные были полным сезоном).
+    Тянем эндпоинт целиком (кэшируется по лиге, без даты в ключе — это
+    один и тот же полный список для любой даты) и фильтруем по дате матча
+    на нашей стороне, как уже сделано для team_id в team_matches()."""
     matches: list[dict] = []
     for league in _LEAGUES:
         try:
-            data = await _get(f"/{league}/games", params={"date": date_str}, cache_key=f"cs_games:{league}:{date_str}")
+            data = await _get(f"/{league}/games", cache_key=f"cs_games:{league}")
         except SportProviderError:
             continue
         raw_matches = data.get("data") or data.get("games") or []
-        if isinstance(raw_matches, list):
-            matches.extend(_map_fixture(m) for m in raw_matches if isinstance(m, dict))
+        if not isinstance(raw_matches, list):
+            continue
+        for m in raw_matches:
+            if not isinstance(m, dict):
+                continue
+            scheduled_at = first(m, "scheduled_at", "start_time", default="")
+            if isinstance(scheduled_at, str) and scheduled_at[:10] == date_str:
+                matches.append(_map_fixture(m))
     return matches

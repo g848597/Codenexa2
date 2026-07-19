@@ -9,11 +9,12 @@
 // виртуального DOM, достаточно для этого объёма интерактивности).
 
 import { docsApi } from '../config/docsApi.js';
-import { haptic, isInsideTelegram, openInvoice, openTelegramLink, showAlert } from '../telegram.js';
+import { haptic, showAlert } from '../telegram.js';
 import { captureReturnTarget, getReturnTarget, reopenProductIfNeeded } from '../navigation.js';
 import { esc } from '../utils/html.js';
 import { icon } from '../utils/icons.js';
 import { backButtonHTML as _backButtonHTML, errorHTML as _errorHTML, loadingHTML as _loadingHTML } from '../utils/loadingState.js';
+import { showPlanCheckout } from './planCheckoutModal.js';
 
 let root = null;
 let screenStack = [{ name: 'home' }];
@@ -1015,7 +1016,7 @@ function wireProfile() {
 // Экран: Тарифы и оплата
 // =========================================================================
 
-let tariffsState = { plans: null, status: null, limit: null, loading: false, error: null, checkoutFor: null, checkoutResult: null, checkoutError: null };
+let tariffsState = { plans: null, status: null, limit: null, loading: false, error: null };
 
 function renderTariffs() {
   if (!tariffsState.plans && !tariffsState.loading) {
@@ -1057,35 +1058,6 @@ function renderTariffs() {
         </ul>
         ${sub.active && sub.plan === p.code ? '' : `<button class="da-btn-primary" data-buy="${esc(p.code)}">Оформить</button>`}
       </div>`).join('')}
-  </div>
-  ${tariffsState.checkoutFor ? renderCheckoutPanel() : ''}
-  `;
-}
-
-function renderCheckoutPanel() {
-  const planCode = tariffsState.checkoutFor;
-  const plan = tariffsState.plans.find((p) => p.code === planCode);
-  if (tariffsState.checkoutResult) {
-    const r = tariffsState.checkoutResult;
-    if (r.method === 'stars') {
-      return `<div class="da-checkout"><p>Открываю оплату через Telegram Stars…</p></div>`;
-    }
-    if (r.method === 'cryptobot') {
-      return `<div class="da-checkout">
-        <p>Счёт на оплату создан. Откройте ссылку, чтобы оплатить криптовалютой:</p>
-        ${r.payUrl ? `<button class="da-btn-primary" data-open-pay="${esc(r.payUrl)}">${icon('externalLink')} Перейти к оплате</button>` : ''}
-        <p class="da-hint-block">Тариф активируется автоматически сразу после оплаты.</p>
-      </div>`;
-    }
-  }
-  return `
-  <div class="da-checkout">
-    <p>Оплата тарифа <b>${esc(plan?.title || planCode)}</b> — выберите способ:</p>
-    <div class="da-actions">
-      <button class="da-btn-secondary" data-method="cryptobot">₿ Криптовалюта (USDT/TON/BTC)</button>
-      ${isInsideTelegram() ? `<button class="da-btn-primary" data-method="stars">${icon('star')} Telegram Stars</button>` : ''}
-    </div>
-    ${tariffsState.checkoutError ? `<div class="da-inline-error">${icon('alertTriangle')} ${esc(tariffsState.checkoutError)}</div>` : ''}
   </div>`;
 }
 
@@ -1098,72 +1070,31 @@ async function loadTariffs() {
       docsApi.getBillingStatus(),
       docsApi.getDocsLimit(),
     ]);
-    tariffsState = { plans: plansData.plans, status, limit, loading: false, error: null, checkoutFor: null, checkoutResult: null, checkoutError: null };
+    tariffsState = { plans: plansData.plans, status, limit, loading: false, error: null };
     render();
   } catch (e) {
-    tariffsState = { plans: null, status: null, limit: null, loading: false, error: e.message, checkoutFor: null, checkoutResult: null, checkoutError: null };
+    tariffsState = { plans: null, status: null, limit: null, loading: false, error: e.message };
     render();
   }
 }
 
+// Тариф и оплата — мини-окно поверх текущего экрана (см.
+// components/planCheckoutModal.js), а не разворачивающийся блок на той же
+// странице, как было раньше. Оплата идёт через тот же docsApi.checkout(),
+// который уже работал — здесь только новый UI вокруг него.
 function wireTariffs() {
   root.querySelectorAll('[data-buy]').forEach((btn) => {
     btn.addEventListener('click', () => {
       haptic('light');
-      tariffsState.checkoutFor = btn.dataset.buy;
-      tariffsState.checkoutResult = null;
-      tariffsState.checkoutError = null;
-      render();
+      showPlanCheckout({
+        plans: tariffsState.plans,
+        planCode: btn.dataset.buy,
+        lockPlan: true,
+        checkout: (code, method, network) => docsApi.checkout(code, method, network),
+        onSuccess: () => loadTariffs(),
+      });
     });
   });
-
-  root.querySelectorAll('[data-method]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      haptic('medium');
-      const method = btn.dataset.method;
-      const plan = tariffsState.checkoutFor;
-
-      if (method === 'cryptobot') {
-        const network = window.prompt('Актив для оплаты: USDT, TON или BTC', 'USDT');
-        if (!network) return;
-        await runCheckout(plan, method, network.trim().toUpperCase());
-        return;
-      }
-      await runCheckout(plan, method);
-    });
-  });
-
-  const payBtn = root.querySelector('[data-open-pay]');
-  if (payBtn) payBtn.addEventListener('click', () => {
-    openTelegramLink(payBtn.dataset.openPay);
-  });
-}
-
-async function runCheckout(plan, method, network) {
-  try {
-    const result = await docsApi.checkout(plan, method, network);
-    tariffsState.checkoutResult = result;
-    tariffsState.checkoutError = null;
-    render();
-
-    if (method === 'stars') {
-      if (isInsideTelegram()) {
-        openInvoice(result.invoiceLink, (status) => {
-          if (status === 'paid') {
-            haptic('medium');
-            showAlert('Оплата прошла успешно! Тариф активирован.');
-            tariffsState = { plans: null, status: null, limit: null, loading: false, error: null, checkoutFor: null, checkoutResult: null, checkoutError: null };
-            loadTariffs();
-          }
-        });
-      } else {
-        showAlert('Оплата через Telegram Stars доступна только внутри Telegram.');
-      }
-    }
-  } catch (e) {
-    tariffsState.checkoutError = e.message;
-    render();
-  }
 }
 
 // =========================================================================

@@ -522,3 +522,119 @@ button[data-acc-buy], button[data-acc-2fa-start], button[data-acc-revoke-session
 .sa-venue-icon { font-size: 18px; margin-bottom: 6px; }
 .sa-venue-name { font-size: 13px; font-weight: 600; }
 .sa-venue-sub { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+
+/* --- Обновление из round10: улучшённые .acc-payment + модалка оплаты pcm-* --- */
+.acc-payment {
+  display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--line); font-size: 13px;
+}
+.acc-payment > span:first-child { flex: 1; min-width: 0; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acc-payment-provider { flex: none; color: var(--text-faint); font-size: 11px; text-transform: capitalize; background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 8px; padding: 3px 9px; }
+.acc-payment-status { flex: none; font-family: var(--font-mono); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 3px 9px; border-radius: 10px; background: var(--bg-elevated); color: var(--text-faint); }
+.acc-payment-date { flex: none; width: 100%; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); text-align: right; margin-top: 2px; }
+@media (min-width: 420px) {
+  .acc-payment { flex-wrap: nowrap; }
+  .acc-payment-date { width: auto; margin-top: 0; }
+}
+@media (max-width: 419px) {
+  .acc-payment { flex-wrap: wrap; }
+}
+
+/* ============================================================================
+   Plan Checkout Modal (pcm-*) — общее мини-окно "выбрать тариф → оплатить"
+   для AI Docs и AI Sport (см. components/planCheckoutModal.js). Раньше клик
+   по тарифу либо уводил на вкладку "Аккаунт" (AI Sport), либо разворачивал
+   блок оплаты прямо на странице (AI Docs) — теперь везде одно и то же
+   лёгкое окно поверх текущего экрана, тот же bottom-sheet паттерн, что и
+   .inv-sheet в investors.css, но со своими классами, т.к. модуль общий для
+   всего приложения, а не только для страницы инвестора.
+   ========================================================================= */
+
+.pcm-backdrop {
+  position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(4,5,7,0.62); backdrop-filter: blur(2px);
+  opacity: 0; transition: opacity .28s var(--ease), backdrop-filter .28s var(--ease);
+  pointer-events: none;
+}
+.pcm-backdrop.is-open { opacity: 1; backdrop-filter: blur(6px); pointer-events: auto; }
+body.pcm-lock { overflow: hidden; }
+
+.pcm-sheet {
+  position: relative; width: 100%; max-width: 480px; max-height: 86vh; overflow-y: auto;
+  padding: 14px 22px 26px; border-radius: 26px 26px 0 0;
+  background: radial-gradient(ellipse 420px 220px at 15% -10%, var(--ledger-dim), transparent 60%), var(--bg-card);
+  border: var(--border-glass); border-bottom: none;
+  box-shadow: 0 -20px 60px -20px rgba(0,0,0,0.6), 0 0 0 1px var(--ledger-dim);
+  backdrop-filter: blur(22px);
+  transform: translateY(100%);
+  transition: transform .36s var(--ease-out);
+}
+.pcm-backdrop.is-open .pcm-sheet { transform: translateY(0); }
+
+.pcm-handle { width: 40px; height: 4px; border-radius: 4px; background: var(--line-strong); margin: 0 auto 14px; }
+.pcm-close {
+  position: absolute; top: 16px; right: 18px; width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--line-strong); color: var(--text-dim);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.pcm-close:hover { background: rgba(255,255,255,0.09); color: var(--text); }
+.pcm-close svg { width: 15px; height: 15px; }
+
+.pcm-head { padding-top: 4px; margin-bottom: 18px; }
+.pcm-title { font-family: var(--font-display); font-size: 19px; font-weight: 700; letter-spacing: -0.2px; }
+.pcm-sub { font-size: 12.5px; color: var(--text-faint); margin-top: 6px; line-height: 1.5; }
+
+.pcm-back-link {
+  display: inline-flex; align-items: center; gap: 4px; background: none; border: none; cursor: pointer;
+  font-size: 12px; font-weight: 600; color: var(--text-dim); padding: 0; margin-bottom: 12px;
+}
+.pcm-back-link svg { width: 13px; height: 13px; }
+.pcm-back-link:hover { color: var(--text); }
+
+.pcm-plan-list { display: flex; flex-direction: column; gap: 10px; }
+.pcm-plan-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer;
+  padding: 15px 16px; border-radius: var(--radius-md); border: 1px solid var(--line-strong);
+  background: rgba(255,255,255,0.03); color: var(--text);
+  transition: border-color .2s var(--ease), background .2s var(--ease), transform .15s var(--ease-spring);
+}
+.pcm-plan-row:hover { border-color: var(--ledger); background: var(--ledger-dim); transform: translateY(-1px); }
+.pcm-plan-row svg { flex: none; width: 15px; height: 15px; color: var(--text-faint); }
+.pcm-plan-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pcm-plan-row-title { font-family: var(--font-display); font-size: 14.5px; font-weight: 600; }
+.pcm-plan-row-days { font-size: 11px; color: var(--text-faint); }
+.pcm-plan-row-price { flex: none; font-family: var(--font-mono); font-size: 16px; font-weight: 700; color: var(--ledger); }
+
+.pcm-sum-card {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
+  padding: 22px 18px; border-radius: var(--radius-lg); border: 1px solid var(--line-strong);
+  background: var(--gradient-surface), var(--bg-elevated); margin-bottom: 14px;
+}
+.pcm-sum-label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .05em; font-family: var(--font-mono); }
+.pcm-sum-value { font-family: var(--font-mono); font-size: 34px; font-weight: 700; color: var(--text); margin-top: 4px; }
+.pcm-sum-alt { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+
+.pcm-pay-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.pcm-pay-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  padding: 14px; border-radius: var(--radius-sm); font-weight: 700; font-size: 14px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: rgba(255,255,255,0.04); color: var(--text);
+  transition: border-color .2s var(--ease), background .2s var(--ease), opacity .2s var(--ease);
+}
+.pcm-pay-btn:hover { border-color: var(--steel); background: var(--steel-dim); }
+.pcm-pay-btn:disabled { opacity: .55; cursor: default; }
+.pcm-pay-btn svg { width: 16px; height: 16px; }
+.pcm-pay-btn-primary { background: var(--gradient-ledger); color: var(--on-ledger); border: none; box-shadow: var(--glow-ledger); }
+.pcm-pay-btn-primary:hover { background: var(--gradient-ledger); filter: brightness(1.06); }
+
+.pcm-fineprint { font-size: 10.5px; color: var(--text-faint); text-align: center; margin-top: 14px; line-height: 1.5; }
+.pcm-error { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--danger-text); background: var(--danger-dim); border-radius: var(--radius-sm); padding: 9px 12px; margin-bottom: 12px; }
+.pcm-error svg { width: 14px; height: 14px; flex: none; }
+
+.pcm-result { text-align: center; padding: 10px 4px 4px; display: flex; flex-direction: column; align-items: center; }
+.pcm-result-icon {
+  width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--gradient-ledger); color: var(--on-ledger); box-shadow: var(--glow-ledger); margin-bottom: 14px;
+}
+.pcm-result-icon svg { width: 24px; height: 24px; }
+.pcm-result .pcm-pay-btn { margin-top: 16px; }

@@ -122,7 +122,9 @@ class Settings:
     # подключается автоматически, когда footballdata.io исчерпает лимит или
     # ответит ошибкой.
     CLEARSPORTS_API_KEY = _clean_env("CLEARSPORTS_API_KEY")
-    CLEARSPORTS_BASE_URL = _clean_env("CLEARSPORTS_BASE_URL", "https://api.clearsportsapi.com/v1")
+    # ИСПРАВЛЕНО: реальные пути ClearSports начинаются с "/api/v1/..." — без
+    # сегмента "/api" каждый запрос ловил 404 (подтверждено проверкой).
+    CLEARSPORTS_BASE_URL = _clean_env("CLEARSPORTS_BASE_URL", "https://api.clearsportsapi.com/api/v1")
     SPORT_API_TIMEOUT = float(os.getenv("API_TIMEOUT", "10"))
     SPORT_API_RETRIES = int(os.getenv("API_RETRIES", "2"))
     SPORT_CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))
