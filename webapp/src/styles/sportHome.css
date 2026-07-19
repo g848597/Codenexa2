@@ -1,9 +1,9 @@
 /* sportHome.css — визуал главного экрана AI Sport (sportApp.js: renderHome()).
    Тот же дизайн-язык, что и docsHome.css — токены из tokens.css. Реальные
-   данные (команды/live/тарифы) оборачивают то, что приходит с /api/sport/* и
-   /api/billing/plans; блоки "Топ матчи сегодня" и "Ваша статистика" — заявленное
-   демо-оформление референс-макета (см. комментарий у DEMO_TOP_MATCHES в
-   sportApp.js) и явно подписаны как демо на экране. */
+   данные (команды/live/тарифы/прогнозы) оборачивают то, что приходит с
+   /api/sport/* и /api/billing/plans — никакого демо-контента на этом экране
+   больше нет (раньше здесь были блоки-заглушки "Топ матчи"/"Ваша статистика",
+   их убрали вместе с переходом на реальные прогнозы, см. .sa-pred-chip). */
 
 /* ---------- шапка модуля (бренд-хедер на home / простая back-панель на подэкранах) ---------- */
 
@@ -123,8 +123,8 @@
   background: var(--bg-card); border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); margin-bottom: 16px;
 }
 
-.sa-day-head { display: flex; align-items: center; justify-content: space-between; }
-.sa-day-tabs { display: flex; gap: 6px; background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 3px; }
+.sa-day-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.sa-day-tabs { display: flex; flex-wrap: wrap; gap: 6px; background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 3px; }
 .sa-day-tab { padding: 6px 14px; border-radius: 7px; border: none; background: none; color: var(--text-dim); font-size: 12px; font-weight: 500; cursor: pointer; }
 .sa-day-tab.active { background: var(--bg-card); color: var(--text); box-shadow: 0 1px 6px rgba(0,0,0,0.25); }
 .sa-upsell {
@@ -156,7 +156,11 @@
 .sa-plan-price em { font-style: normal; font-size: 9.5px; font-weight: 500; color: var(--text-faint); display: flex; align-items: center; gap: 3px; }
 .sa-plan-featured { border-color: var(--ledger); box-shadow: var(--glow-ledger); }
 .sa-plan-featured .sa-plan-title { color: var(--ledger); }
+.sa-plan-current { border-color: var(--violet); }
+.sa-plan-current .sa-plan-title { color: var(--violet); }
+.sa-plan-quota { font-size: 9px; color: var(--text-faint); line-height: 1.4; }
 .sa-plan-badge { display: flex; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 600; color: var(--ledger); }
+.sa-plan-badge-current { color: var(--violet); }
 
 /* ---------- герб команды / плейсхолдер ---------- */
 
@@ -196,41 +200,47 @@
 .sa-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff5a40; display: inline-block; animation: sa-pulse 1.4s ease-in-out infinite; }
 @keyframes sa-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-/* ---------- "Топ матчи сегодня" — демо-карточки с прогнозом ---------- */
+/* ---------- прогноз матча (реальный, см. app/web/integrations/predictions.py) ---------- */
 
-.sa-pred-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-.sa-pred-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px; }
-.sa-pred-league { font-size: 9.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; }
-.sa-pred-main { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; }
-.sa-pred-teams { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-.sa-pred-team { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; color: var(--text); }
-.sa-pred-team span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sa-pred-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 92px; }
-.sa-pred-pick-label { font-size: 10px; color: var(--ledger); font-weight: 600; }
-.sa-pred-confidence { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--text); display: flex; flex-direction: column; }
-.sa-pred-confidence em { font-style: normal; font-size: 8.5px; font-weight: 500; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.3px; }
-.sa-pred-bar { display: block; width: 78px; height: 3px; border-radius: 2px; background: var(--line-strong); overflow: hidden; margin-top: 2px; }
-.sa-pred-bar span { display: block; height: 100%; background: var(--gradient-ledger); border-radius: 2px; }
-.sa-pred-odds { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.sa-pred-odds span { font-family: var(--font-mono); font-size: 16px; font-weight: 700; color: var(--text); }
-.sa-pred-odds em { font-style: normal; font-size: 8.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.3px; }
-.sa-pred-fav { grid-row: 1 / 3; background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 2px; align-self: start; }
-.sa-pred-fav:hover { color: var(--amber); }
+.sa-pred-chip {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 9px; padding: 7px 10px;
+  background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 9px;
+  font-size: 10.5px; width: 100%; box-sizing: border-box;
+}
+.sa-pred-label { display: flex; align-items: center; gap: 5px; color: var(--text-dim); font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sa-pred-label svg { color: var(--violet); flex-shrink: 0; }
+.sa-pred-bar { flex-shrink: 0; width: 46px; height: 4px; border-radius: 2px; background: var(--line-strong); overflow: hidden; }
+.sa-pred-bar-fill { display: block; height: 100%; background: var(--gradient-ledger); border-radius: 2px; }
+.sa-pred-conf { font-family: var(--font-mono); font-weight: 700; font-size: 11px; color: var(--text); flex-shrink: 0; }
+.sa-pred-basis { flex-basis: 100%; font-size: 9.5px; color: var(--text-faint); margin-top: 2px; }
+.sa-pred-home .sa-pred-bar-fill, .sa-pred-away .sa-pred-bar-fill { background: var(--gradient-ledger); }
+.sa-pred-draw .sa-pred-bar-fill { background: linear-gradient(135deg, #b7bcc4, var(--text-faint)); }
 
-/* ---------- "Ваша статистика" — демо-карточки со спарклайнами ---------- */
+.sa-pred-chip.sa-pred-locked {
+  border: 1px dashed var(--line-strong); background: none; cursor: pointer; color: var(--text-faint);
+  justify-content: center; text-align: center;
+}
+.sa-pred-chip.sa-pred-locked span { display: flex; align-items: center; gap: 6px; }
+.sa-pred-chip.sa-pred-locked svg { color: var(--amber); }
 
-.sa-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 6px; }
-.sa-stat-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px; }
-.sa-stat-value { font-family: var(--font-mono); font-size: 19px; font-weight: 700; margin-bottom: 2px; }
-.sa-stat-ledger { color: var(--ledger); }
-.sa-stat-violet { color: var(--violet); }
-.sa-stat-steel { color: var(--steel); }
-.sa-stat-label { font-size: 11.5px; color: var(--text); font-weight: 500; }
-.sa-stat-sub { font-size: 9.5px; color: var(--text-faint); margin-bottom: 8px; }
-.sa-spark { width: 100%; height: 26px; display: block; }
-.sa-spark-ledger { color: var(--ledger); }
-.sa-spark-violet { color: var(--violet); }
-.sa-spark-steel { color: var(--steel); }
+/* ---------- тизер "Показать матчи" + вкладки дней с блокировкой ---------- */
+
+.sa-day-teaser {
+  display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center;
+  background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius-md);
+  padding: 18px 16px;
+}
+.sa-day-teaser-row { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+.sa-day-teaser-tier { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text); }
+.sa-day-teaser-tier svg { color: var(--violet); }
+.sa-day-teaser-quota { font-size: 10.5px; color: var(--text-faint); }
+.sa-btn-primary {
+  display: flex; align-items: center; gap: 7px; border: none; border-radius: var(--radius-sm);
+  background: var(--gradient-ledger); color: var(--on-ledger); font-weight: 600; font-size: 13px;
+  padding: 11px 20px; cursor: pointer; box-shadow: var(--glow-ledger);
+}
+.sa-day-tab-locked { display: flex; align-items: center; gap: 4px; color: var(--text-faint); opacity: 0.75; }
+.sa-day-tab-locked svg { width: 10px; height: 10px; }
 
 /* ---------- карточка команды ---------- */
 

@@ -593,8 +593,10 @@ def _run_migrations(conn):
 # PLANS, который был в billing.py до раунда 8, — миграция с БД без плейсхолдер-
 # значений на старте не создаёт разрыва в ценах для уже развёрнутых окружений.
 _DEFAULT_PLANS = (
+    {"code": "start_monthly", "title": "Старт — месяц", "usd": "3.00", "stars": 150},
     {"code": "pro_monthly", "title": "Pro — месяц", "usd": "9.00", "stars": 500},
     {"code": "pro_yearly", "title": "Pro — год", "usd": "79.00", "stars": 4500},
+    {"code": "business_monthly", "title": "Бизнес — месяц", "usd": "19.00", "stars": 1000},
 )
 
 

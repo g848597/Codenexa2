@@ -2,14 +2,13 @@
 app/web/integrations/sport_provider.py: footballdata.io -> clearsportsapi.com
 -> ...) для мини-аппа.
 
-Этот файл — тот самый app/web/api/sport_routes.py, на который ссылался
-комментарий в webapp/src/config/sportApi.js, но которого не было ни в одном
-присланном архиве проекта. Без него /api/sport/* всегда отвечал 404
-независимо от того, какие ключи вписаны в Railway.
-
-Раздел публичный: список команд и live-счёт одинаковы для всех
-пользователей, поэтому, в отличие от /api/billing, /api/referrals и т.д.,
-авторизация здесь не требуется.
+РАУНД 9 — тарифная лестница вместо бинарного free/PRO (см. беседу с
+владельцем продукта): 4 тарифа (free/start/pro/business), каждый открывает
+больше дней вперёд и больше матчей в день с реальным ИИ-прогнозом (см.
+app/web/integrations/predictions.py и app/web/integrations/sport_common.py —
+TIER_RULES). Раздел остаётся публичным для базового просмотра (список
+команд/live-счёт), но конкретно /matches теперь всегда учитывает
+пользователя — даже анонимного (тариф free), — чтобы отдать честную квоту.
 """
 from datetime import date, timedelta
 
@@ -18,27 +17,44 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.web import repo
 from app.web.deps import get_current_user_optional
 from app.web.integrations import sport_provider as sport
-from app.web.integrations.sport_common import SportProviderError
+from app.web.integrations.sport_common import SportProviderError, tier_from_plan_code, tier_rule
 
 router = APIRouter(prefix="/api/sport", tags=["sport"])
 
-# Бесплатный показ ограничен, чтобы не отдавать полную сетку матчей без
-# подписки (см. чат — просьба владельца проекта). "PRO" здесь — реальная
-# активная подписка (см. repo.get_active_subscription): оплачена И либо
-# бессрочна, либо срок ещё не истёк — та же проверка, что и в billing.py
-# (/api/billing/status -> subscription.active) и личном кабинете.
-FREE_MATCHES_LIMIT = 1
 
-
-def _has_paid(user: dict | None) -> bool:
+def _active_plan_code(user: dict | None) -> str | None:
     if not user:
-        return False
-    return repo.get_active_subscription(user["id"]) is not None
+        return None
+    sub = repo.get_active_subscription(user["id"])
+    return sub["plan"] if sub else None
+
+
+def _user_tier(user: dict | None) -> str:
+    return tier_from_plan_code(_active_plan_code(user))
+
+
+def _tier_payload(tier: str) -> dict:
+    rule = tier_rule(tier)
+    return {
+        "tier": tier,
+        "tierTitle": rule["title"],
+        "daysUnlocked": rule["days"],
+        "predMin": rule["pred_min"],
+        "predMax": rule["pred_max"],
+    }
 
 
 @router.get("/status")
 async def status():
     return {"configured": sport.is_configured()}
+
+
+@router.get("/tier")
+async def tier_info(user: dict | None = Depends(get_current_user_optional)):
+    """Тариф текущего пользователя (или free для анонимных/гостей) — фронтенд
+    строит по этому вкладки дней и подписи квоты прогнозов (см. sportApp.js),
+    не дублируя правила тарифов на своей стороне."""
+    return _tier_payload(_user_tier(user))
 
 
 @router.get("/teams/popular")
@@ -102,22 +118,63 @@ async def live():
     return {"matches": matches, "configured": True}
 
 
+def _fixture_key(f: dict) -> tuple[str, str]:
+    return (str((f.get("home") or {}).get("id")), str((f.get("away") or {}).get("id")))
+
+
 @router.get("/matches")
 async def matches(
-    when: str = Query("today", pattern="^(today|tomorrow)$"),
+    day: int = Query(0, ge=0, le=3, description="Смещение от сегодня: 0=сегодня, 1=завтра, …, 3"),
     user: dict | None = Depends(get_current_user_optional),
 ):
-    if not sport.is_configured():
-        return {"matches": [], "configured": False, "limited": False, "total": 0}
+    tier = _user_tier(user)
+    rule = tier_rule(tier)
+    payload = _tier_payload(tier)
 
-    target_date = date.today() if when == "today" else date.today() + timedelta(days=1)
+    if not sport.is_configured():
+        return {**payload, "matches": [], "configured": False, "dayLocked": False, "total": 0, "predictedCount": 0}
+
+    # День вне лестницы тарифа — не дёргаем источник данных вообще (нет
+    # смысла тратить лимит внешнего API на день, который всё равно не
+    # покажем): фронтенд получает чёткий "закрыто с тарифа X", а не пустой
+    # список матчей, который выглядел бы как "матчей просто нет".
+    if day >= rule["days"]:
+        return {**payload, "matches": [], "configured": True, "dayLocked": True, "total": 0, "predictedCount": 0}
+
+    target_date = date.today() + timedelta(days=day)
     try:
         found = await sport.matches_by_date(target_date.isoformat())
     except SportProviderError:
-        return {"matches": [], "configured": True, "degraded": True, "limited": False, "total": 0}
+        return {**payload, "matches": [], "configured": True, "degraded": True, "dayLocked": False, "total": 0, "predictedCount": 0}
 
     total = len(found)
-    if _has_paid(user):
-        return {"matches": found, "configured": True, "limited": False, "total": total}
 
-    return {"matches": found[:FREE_MATCHES_LIMIT], "configured": True, "limited": total > FREE_MATCHES_LIMIT, "total": total}
+    # Прогноз строим только для ближайших предстоящих матчей (NS) и только на
+    # квоту тарифа — так тариф ограничивает именно число прогнозов, а не
+    # список самих матчей (матчи все настоящие и видны все — см. переписку с
+    # владельцем продукта: "матчи всегда реальные").
+    upcoming = [f for f in found if f["statusShort"] == "NS"]
+    quota = min(rule["pred_max"], len(upcoming))
+    to_predict = upcoming[:quota]
+
+    predictions_by_key = {}
+    if to_predict:
+        try:
+            predictions_by_key = await sport.predict_matches(to_predict)
+        except Exception:  # noqa: BLE001 — прогноз необязателен, список матчей важнее
+            predictions_by_key = {}
+
+    for f in found:
+        pred = predictions_by_key.get(_fixture_key(f))
+        f["prediction"] = pred
+
+    predicted_count = sum(1 for f in found if f.get("prediction"))
+
+    return {
+        **payload,
+        "matches": found,
+        "configured": True,
+        "dayLocked": False,
+        "total": total,
+        "predictedCount": predicted_count,
+    }

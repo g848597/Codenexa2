@@ -43,10 +43,12 @@ async function request(path) {
 
 export const sportApi = {
   status: () => request('/api/sport/status'),
+  tier: () => request('/api/sport/tier'),
   popularTeams: () => request('/api/sport/teams/popular'),
   searchTeams: (q) => request(`/api/sport/teams/search?q=${encodeURIComponent(q)}`),
   teamDetail: (id) => request(`/api/sport/teams/${encodeURIComponent(id)}`),
   teamMatches: (id) => request(`/api/sport/teams/${encodeURIComponent(id)}/matches`),
   liveMatches: () => request('/api/sport/live'),
-  matchesByDate: (when) => request(`/api/sport/matches?when=${encodeURIComponent(when)}`),
+  // day: смещение от сегодня (0=сегодня, 1=завтра, …, 3) — см. sport_routes.py.
+  matchesByDay: (day) => request(`/api/sport/matches?day=${encodeURIComponent(day)}`),
 };

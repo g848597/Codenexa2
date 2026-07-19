@@ -11,7 +11,7 @@ team_matches, live_matches — все async, кроме is_configured), импо
 его здесь и дописать в конец списка PROVIDERS. Порядок в списке = порядок
 использования.
 """
-from app.web.integrations import clearsports, footballdata
+from app.web.integrations import clearsports, footballdata, predictions
 from app.web.integrations.sport_common import SportProviderError
 
 PROVIDERS = [footballdata, clearsports]
@@ -75,3 +75,12 @@ async def live_matches() -> list[dict]:
 async def matches_by_date(date_str: str) -> list[dict]:
     result = await _call("matches_by_date", date_str)
     return result or []
+
+
+async def predict_matches(fixtures: list[dict]) -> dict:
+    """Прогнозы (см. predictions.py) для переданного списка матчей — вызывающий
+    код (sport_routes.py) сам решает, сколько матчей входит в квоту тарифа и
+    передаёт сюда только их, а не весь день целиком."""
+    if not fixtures:
+        return {}
+    return await predictions.predict_many(fixtures, team_matches)

@@ -22,7 +22,7 @@ import time
 import httpx
 
 from app.web.config import settings
-from app.web.integrations.sport_common import SportProviderError, first as _first
+from app.web.integrations.sport_common import SportProviderError, first as _first, with_winner as _with_winner
 
 _cache: dict[str, tuple[float, dict]] = {}
 
@@ -142,14 +142,17 @@ def _map_fixture(raw: dict) -> dict:
     away = raw.get("away_team") or raw.get("away") or {}
     score = raw.get("score") if isinstance(raw.get("score"), dict) else {}
     status_raw = str(_first(raw, "status", "status_short", default="")).strip().lower()
+    status_short = _STATUS_MAP.get(status_raw, status_raw.upper() or "NS")
+    goals_home = _first(score, "home") if score else _first(raw, "goals_home", "home_score", "home_goals")
+    goals_away = _first(score, "away") if score else _first(raw, "goals_away", "away_score", "away_goals")
     return {
-        "statusShort": _STATUS_MAP.get(status_raw, status_raw.upper() or "NS"),
+        "statusShort": status_short,
         "elapsed": _first(raw, "elapsed", "minute"),
         "timestamp": _first(raw, "timestamp", "kickoff_timestamp", "start_timestamp"),
-        "goalsHome": _first(score, "home") if score else _first(raw, "goals_home", "home_score", "home_goals"),
-        "goalsAway": _first(score, "away") if score else _first(raw, "goals_away", "away_score", "away_goals"),
-        "home": _map_team_ref(home if isinstance(home, dict) else {}),
-        "away": _map_team_ref(away if isinstance(away, dict) else {}),
+        "goalsHome": goals_home,
+        "goalsAway": goals_away,
+        "home": _with_winner(_map_team_ref(home if isinstance(home, dict) else {}), goals_home, goals_away, status_short),
+        "away": _with_winner(_map_team_ref(away if isinstance(away, dict) else {}), goals_away, goals_home, status_short),
     }
 
 

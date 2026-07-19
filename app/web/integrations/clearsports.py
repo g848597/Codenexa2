@@ -21,7 +21,7 @@ import time
 import httpx
 
 from app.web.config import settings
-from app.web.integrations.sport_common import SportProviderError, first
+from app.web.integrations.sport_common import SportProviderError, first, with_winner
 
 # Топ-5 лиг — держим тот же охват, что и у footballdata.io (5 лиг на бесплатном
 # тарифе), чтобы оба источника были сопоставимы по объёму данных.
@@ -139,14 +139,17 @@ def _map_fixture(raw: dict) -> dict:
             timestamp = int(datetime.fromisoformat(scheduled_at.replace("Z", "+00:00")).timestamp())
         except ValueError:
             timestamp = None
+    status_short = _STATUS_MAP.get(status_raw, status_raw.upper() or "NS")
+    goals_home = first(raw, "home_score", "home_points")
+    goals_away = first(raw, "away_score", "away_points")
     return {
-        "statusShort": _STATUS_MAP.get(status_raw, status_raw.upper() or "NS"),
+        "statusShort": status_short,
         "elapsed": first(raw, "elapsed", "minute"),
         "timestamp": timestamp,
-        "goalsHome": first(raw, "home_score", "home_points"),
-        "goalsAway": first(raw, "away_score", "away_points"),
-        "home": _map_team_ref(home if isinstance(home, dict) else {}),
-        "away": _map_team_ref(away if isinstance(away, dict) else {}),
+        "goalsHome": goals_home,
+        "goalsAway": goals_away,
+        "home": with_winner(_map_team_ref(home if isinstance(home, dict) else {}), goals_home, goals_away, status_short),
+        "away": with_winner(_map_team_ref(away if isinstance(away, dict) else {}), goals_away, goals_home, status_short),
     }
 
 

@@ -116,6 +116,32 @@ function scoreOrTimeHTML(f) {
   return `<div class="sa-score sa-score-time">vs</div>`;
 }
 
+// Прогноз (см. app/web/integrations/predictions.py) показывается только для
+// предстоящих матчей (NS) — для сыгранных/идущих сейчас прогноз не имеет
+// смысла. showPrediction=false используется на экранах, где матч уже не в
+// контексте тарифной квоты дня (карточка команды, live-табло) — там прогноз
+// не запрашивается бэкендом вовсе, поэтому f.prediction всегда undefined.
+function predictionChipHTML(f) {
+  if (f.statusShort !== 'NS') return '';
+  if (f.prediction) {
+    const p = f.prediction;
+    return `
+    <div class="sa-pred-chip sa-pred-${esc(p.pick)}">
+      <span class="sa-pred-label">${icon('sparkles')} ${esc(p.label)}</span>
+      <span class="sa-pred-bar"><span class="sa-pred-bar-fill" style="width:${p.confidence}%"></span></span>
+      <span class="sa-pred-conf">${p.confidence}%</span>
+      <span class="sa-pred-basis">${esc(p.basis)}</span>
+    </div>`;
+  }
+  if (f.prediction === null) {
+    return `
+    <button class="sa-pred-chip sa-pred-locked" data-open-pro>
+      <span>${icon('lock')} Прогноз на этот матч — в старшем тарифе</span>
+    </button>`;
+  }
+  return '';
+}
+
 function fixtureRowHTML(f) {
   const cls = matchStatusClass(f);
   // Раньше вся строка была одной <button> с data-team жёстко на f.home.id —
@@ -131,6 +157,7 @@ function fixtureRowHTML(f) {
       <div class="sa-fixture-score-block">${scoreOrTimeHTML(f)}</div>
       <button class="sa-fixture-team sa-fixture-team-away" data-team="${f.away.id ?? ''}"><span class="sa-fixture-team-name">${esc(f.away.name)}</span>${crestHTML(f.away, 'md')}</button>
     </div>
+    ${predictionChipHTML(f)}
   </div>`;
 }
 
@@ -151,7 +178,8 @@ export function openSportApp() {
   screenStack = [{ name: 'home' }];
   homeState = { popular: null, error: null };
   homeLive = { matches: null, loaded: false };
-  dayMatches = { when: 'today', matches: null, limited: false, total: 0, loaded: false, error: null };
+  tierState = { loaded: false, tier: 'free', tierTitle: 'Бесплатный', daysUnlocked: 1, predMin: 1, predMax: 3 };
+  dayMatches = { day: 0, revealed: false, matches: null, dayLocked: false, total: 0, predictedCount: 0, loaded: false, error: null };
   plansState = { plans: null };
   searchState = { query: '', results: null, loading: false, error: null };
   render();
@@ -248,7 +276,16 @@ function wireCommon() {
 let homeState = { popular: null, error: null };
 let homeLive = { matches: null, loaded: false };
 let plansState = { plans: null }; // реальные тарифы — authApi.plans() (см. accountApp.js/billingHTML)
-let dayMatches = { when: 'today', matches: null, limited: false, total: 0, loaded: false, error: null };
+// Тариф текущего пользователя (см. /api/sport/tier, sport_common.py TIER_RULES)
+// — определяет, сколько дней вперёд открыто и сколько матчей в день получают
+// прогноз. free по умолчанию, пока реальный ответ ещё не пришёл — так гость
+// не увидит на долю секунды состояние "всё открыто", которое тут же схлопнется.
+let tierState = { loaded: false, tier: 'free', tierTitle: 'Бесплатный', daysUnlocked: 1, predMin: 1, predMax: 3 };
+// "Матчи по дням" — раньше грузились и показывались сразу при открытии
+// раздела. Теперь явный шаг: домашний экран показывает тизер с квотой
+// тарифа и кнопку "Показать матчи" — revealed=true только после тапа
+// (см. владелец продукта: "нету кнопки просмотр матчей, даётся сразу").
+let dayMatches = { day: 0, revealed: false, matches: null, dayLocked: false, total: 0, predictedCount: 0, loaded: false, error: null };
 
 function renderHome() {
   if (!homeState.popular && !homeState.error) {
@@ -272,29 +309,60 @@ function renderHome() {
     ? `<div class="sa-hint-block">Источник живых данных (api-football) пока не подключён на сервере — показываем команды по названиям без гербов и статистики. Как только появится ключ API, здесь честно появятся реальные данные.</div>`
     : '';
 
-  // "Матчи на дату" — реальные фикстуры за сегодня/завтра (см.
-  // /api/sport/matches). Бесплатно виден 1 матч, остальное — по PRO (см.
-  // FREE_MATCHES_LIMIT в sport_routes.py); это ограничение доступа к
-  // настоящим данным, а не выдуманные цифры — сами матчи всегда реальные.
-  const dayBody = dayMatches.error
-    ? errorHTML(dayMatches.error)
-    : !dayMatches.loaded
-      ? loadingHTML('Загружаю матчи…')
-      : !dayMatches.matches || !dayMatches.matches.length
-        ? `<div class="sa-empty-mini">${dayMatches.when === 'today' ? 'Сегодня' : 'Завтра'} матчей по отслеживаемым лигам не найдено.</div>`
-        : `<div class="sa-fixture-list">${dayMatches.matches.map(fixtureRowHTML).join('')}</div>
-           ${dayMatches.limited ? `
-             <button class="sa-upsell" data-open-pro>
-               ${icon('crown')} Ещё ${dayMatches.total - dayMatches.matches.length} матч(-а/-ей) сегодня — открыть в PRO
-             </button>` : ''}`;
+  // "Матчи по дням" — реальные фикстуры (см. /api/sport/matches?day=N).
+  // Тариф определяет: (1) сколько дней вперёд вообще открыто — daysUnlocked
+  // (см. /api/sport/tier), (2) сколько матчей в день получают прогноз —
+  // predMin..predMax. Список матчей на открытых днях всегда полный и
+  // настоящий; ограничивается именно число прогнозов, а не сами матчи.
+  const DAY_LABELS = ['Сегодня', 'Завтра', '+2 дня', '+3 дня'];
+  const daysUnlocked = tierState.daysUnlocked;
+
+  const dayTabsHTML = `<div class="sa-day-tabs">
+    ${DAY_LABELS.map((label, i) => {
+      const locked = i >= daysUnlocked;
+      const active = dayMatches.revealed && dayMatches.day === i && !locked;
+      return `<button class="sa-day-tab ${active ? 'active' : ''} ${locked ? 'sa-day-tab-locked' : ''}" data-day="${i}" ${locked ? 'data-day-locked' : ''}>
+        ${label}${locked ? icon('lock') : ''}
+      </button>`;
+    }).join('')}
+  </div>`;
+
+  let dayBody;
+  if (!dayMatches.revealed) {
+    // Тизер вместо автозагрузки — человек явно решает "показать матчи",
+    // а не утыкается в список ещё до того, как понял тариф и квоту.
+    dayBody = `
+    <div class="sa-day-teaser">
+      <div class="sa-day-teaser-row">
+        <span class="sa-day-teaser-tier">${icon('layers')} Тариф «${esc(tierState.tierTitle)}»</span>
+        <span class="sa-day-teaser-quota">до ${daysUnlocked} ${daysUnlocked === 1 ? 'дня' : 'дней'} вперёд · ${tierState.predMin}–${tierState.predMax} прогнозов в день</span>
+      </div>
+      <button class="sa-btn-primary sa-day-reveal" data-reveal-matches>${icon('zap')} Показать матчи</button>
+    </div>`;
+  } else if (dayMatches.error) {
+    dayBody = errorHTML(dayMatches.error);
+  } else if (!dayMatches.loaded) {
+    dayBody = loadingHTML('Загружаю матчи…');
+  } else if (dayMatches.dayLocked) {
+    dayBody = `
+    <div class="sa-upsell" data-open-pro>
+      ${icon('lock')} Этот день закрыт на тарифе «${esc(tierState.tierTitle)}» — откройте в тарифе выше
+    </div>`;
+  } else if (!dayMatches.matches || !dayMatches.matches.length) {
+    dayBody = `<div class="sa-empty-mini">${DAY_LABELS[dayMatches.day]}: матчей по отслеживаемым лигам не найдено.</div>`;
+  } else {
+    const hiddenPred = dayMatches.total > 0 ? Math.max(0, dayMatches.matches.filter((f) => f.statusShort === 'NS').length - dayMatches.predictedCount) : 0;
+    dayBody = `<div class="sa-fixture-list">${dayMatches.matches.map(fixtureRowHTML).join('')}</div>
+      ${hiddenPred > 0 ? `
+        <button class="sa-upsell" data-open-pro>
+          ${icon('crown')} Ещё ${hiddenPred} ${hiddenPred === 1 ? 'прогноз' : 'прогнозов'} доступно в старшем тарифе
+        </button>` : ''}`;
+  }
 
   const daySection = `
   <div class="sa-section-head sa-day-head">
     <h2>Матчи по дням</h2>
-    <div class="sa-day-tabs">
-      <button class="sa-day-tab ${dayMatches.when === 'today' ? 'active' : ''}" data-day="today">Сегодня</button>
-      <button class="sa-day-tab ${dayMatches.when === 'tomorrow' ? 'active' : ''}" data-day="tomorrow">Завтра</button>
-    </div>
+    ${dayTabsHTML}
   </div>
   ${dayBody}`;
 
@@ -306,21 +374,33 @@ function renderHome() {
   }
 
   // Тарифы: реальные данные из /api/billing/plans (то же, что в личном
-  // кабинете) — до 3 карточек, средняя помечена как рекомендованная, чтобы
-  // визуально повторить макет-референс без выдуманных цен.
-  const plans = (plansState.plans || []).slice(0, 3);
+  // кабинете). Код тарифа определяет "линейку" (start/pro/business —
+  // см. app/web/integrations/sport_common.py tier_from_plan_code — тот же
+  // префикс до "_", здесь только для подписи квоты и подсветки текущего
+  // тарифа, реальные цифры доступа считает бэкенд).
+  const TIER_QUOTA = { start: '2 дня · до 6 прогнозов', pro: '3 дня · до 9 прогнозов', business: '4 дня · до 12 прогнозов' };
+  const tierOf = (code) => String(code || '').split('_')[0];
+  const plans = (plansState.plans || []).slice(0, 4);
+  const recommendedCode = plans.find((p) => tierOf(p.code) === 'pro')?.code;
   const plansSection = plans.length ? `
   <div class="sa-section-head sa-plans-head">
     <h2>Выберите подписку</h2>
     <button class="sa-link-btn" data-open-pro>Все тарифы ${icon('arrowRight')}</button>
   </div>
   <div class="sa-plan-row">
-    ${plans.map((p, i) => `
-      <button class="sa-plan-card ${i === 1 ? 'sa-plan-featured' : ''}" data-open-pro>
+    ${plans.map((p) => {
+      const t = tierOf(p.code);
+      const isCurrent = tierState.loaded && t === tierState.tier;
+      const isFeatured = p.code === recommendedCode && !isCurrent;
+      return `
+      <button class="sa-plan-card ${isFeatured ? 'sa-plan-featured' : ''} ${isCurrent ? 'sa-plan-current' : ''}" data-open-pro>
         <span class="sa-plan-title">${esc(p.title)}</span>
         <span class="sa-plan-price">$${esc(p.usd)}<em>/ ${esc(String(p.stars))} ${icon('star')}</em></span>
-        ${i === 1 ? `<span class="sa-plan-badge">${icon('star')} Популярный</span>` : ''}
-      </button>`).join('')}
+        ${TIER_QUOTA[t] ? `<span class="sa-plan-quota">${TIER_QUOTA[t]}</span>` : ''}
+        ${isCurrent ? `<span class="sa-plan-badge sa-plan-badge-current">${icon('checkCircle')} Ваш тариф</span>`
+          : isFeatured ? `<span class="sa-plan-badge">${icon('star')} Популярный</span>` : ''}
+      </button>`;
+    }).join('')}
   </div>` : '';
 
   return `
@@ -367,15 +447,19 @@ function renderHome() {
 
 async function loadHomeAsync() {
   try {
-    const [popularData, statusData, liveData, plansData] = await Promise.all([
+    const [popularData, statusData, liveData, plansData, tierData] = await Promise.all([
       sportApi.popularTeams(),
       sportApi.status(),
       sportApi.liveMatches().catch(() => null),
       authApi.plans().catch(() => ({ plans: [] })),
+      sportApi.tier().catch(() => null),
     ]);
     apiConfigured = statusData.configured;
     homeState = { popular: popularData.teams, error: null };
     plansState = { plans: plansData.plans || [] };
+    if (tierData) {
+      tierState = { loaded: true, tier: tierData.tier, tierTitle: tierData.tierTitle, daysUnlocked: tierData.daysUnlocked, predMin: tierData.predMin, predMax: tierData.predMax };
+    }
     if (liveData) {
       homeLive = { matches: liveData.matches, loaded: true };
       liveCount = (liveData.matches || []).length;
@@ -383,28 +467,35 @@ async function loadHomeAsync() {
       homeLive = { matches: null, loaded: true };
     }
     render();
-    loadDayMatches('today');
   } catch (e) {
     homeState = { popular: null, error: e.message };
     render();
   }
 }
 
-async function loadDayMatches(when) {
-  dayMatches = { when, matches: null, limited: false, total: 0, loaded: false, error: null };
+async function loadDayMatches(day) {
+  dayMatches = { day, revealed: true, matches: null, dayLocked: false, total: 0, predictedCount: 0, loaded: false, error: null };
   render();
   try {
-    const data = await sportApi.matchesByDate(when);
+    const data = await sportApi.matchesByDay(day);
+    // Ответ несёт и актуальный тариф — если подписка поменялась в другой
+    // вкладке (например, только что оплатили), квота на экране обновится
+    // без перезахода в раздел.
+    if (data.tier) {
+      tierState = { loaded: true, tier: data.tier, tierTitle: data.tierTitle, daysUnlocked: data.daysUnlocked, predMin: data.predMin, predMax: data.predMax };
+    }
     dayMatches = {
-      when,
+      day,
+      revealed: true,
       matches: data.matches || [],
-      limited: !!data.limited,
+      dayLocked: !!data.dayLocked,
       total: data.total || (data.matches || []).length,
+      predictedCount: data.predictedCount || 0,
       loaded: true,
       error: null,
     };
   } catch (e) {
-    dayMatches = { when, matches: null, limited: false, total: 0, loaded: true, error: e.message };
+    dayMatches = { day, revealed: true, matches: null, dayLocked: false, total: 0, predictedCount: 0, loaded: true, error: e.message };
   }
   render();
 }
@@ -440,9 +531,21 @@ function wireHome() {
     document.getElementById('sa-teams-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
 
+  const revealBtn = root.querySelector('[data-reveal-matches]');
+  if (revealBtn) revealBtn.addEventListener('click', () => { haptic('medium'); loadDayMatches(0); });
+
   root.querySelectorAll('[data-day]').forEach((btn) => btn.addEventListener('click', () => {
+    const day = Number(btn.dataset.day);
+    if (btn.hasAttribute('data-day-locked')) {
+      // День вне тарифа — не грузим ничего, сразу ведём на тарифы, чтобы не
+      // притворяться, будто там просто "пока нет матчей".
+      haptic('light');
+      closeSportApp();
+      document.querySelector('.tab[data-view="account"]')?.click();
+      return;
+    }
     haptic('light');
-    if (btn.dataset.day !== dayMatches.when) loadDayMatches(btn.dataset.day);
+    if (!dayMatches.revealed || day !== dayMatches.day) loadDayMatches(day);
   }));
 
   // Реальные тарифы/оплата уже реализованы в личном кабинете (см.
