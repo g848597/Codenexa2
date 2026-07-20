@@ -915,6 +915,23 @@ def create_document(user_id: int, org_id: int | None, template_code: str | None,
         ).fetchone())
 
 
+def count_documents(user_id: int) -> int:
+    row = _fetch_one("SELECT COUNT(*) AS c FROM documents WHERE user_id = ?", (user_id,))
+    return row["c"] if row else 0
+
+
+def count_documents_today(user_id: int) -> int:
+    """Для дневного лимита бесплатного тарифа (см. app/web/api/docs.py,
+    FREE_DAILY_LIMIT) — считает документы, созданные с начала ТЕКУЩИХ
+    суток по времени сервера (UTC), а не за последние 24 часа скользящим
+    окном."""
+    row = _fetch_one(
+        "SELECT COUNT(*) AS c FROM documents WHERE user_id = ? AND created_at >= date_trunc('day', NOW())",
+        (user_id,),
+    )
+    return row["c"] if row else 0
+
+
 def list_documents(user_id: int, page: int = 1, page_size: int = 20):
     offset = max(page - 1, 0) * page_size
     return _fetch_all(
