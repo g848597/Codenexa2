@@ -204,7 +204,12 @@ async def popular_teams() -> list[dict]:
     data = await _get("/leagues", cache_key="leagues")
     leagues = data.get("data") or data.get("leagues") or []
     teams: list[dict] = []
-    for lg in leagues[:3]:
+    # Раньше здесь стояло leagues[:3] и общий предел в 18 команд — это
+    # искусственно резало список даже в пределах того, что и так уже
+    # ограничено бесплатным тарифом footballdata.io (см. docstring файла:
+    # 5 лиг на free-тарифе). Теперь показываем все лиги/команды, которые
+    # реально вернул API — сколько есть, столько и покажем честно.
+    for lg in leagues:
         lid = _first(lg, "id", "league_id")
         if lid is None:
             continue
@@ -213,10 +218,8 @@ async def popular_teams() -> list[dict]:
         except SportProviderError:
             continue
         raw_teams = td.get("data") or td.get("teams") or []
-        teams.extend(_map_team(t) for t in raw_teams[:8] if isinstance(t, dict))
-        if len(teams) >= 18:
-            break
-    return teams[:18]
+        teams.extend(_map_team(t) for t in raw_teams if isinstance(t, dict))
+    return teams
 
 
 async def search_teams(query: str) -> list[dict]:
