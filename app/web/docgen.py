@@ -21,8 +21,21 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Image as RLImage
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+# Встроенные шрифты reportlab (Helvetica и т.п.) — это Type1-шрифты только с
+# латиницей (WinAnsi), в них физически нет кириллических глифов: любой
+# русский текст рендерился чёрными квадратами вместо букв (см. пример PDF в
+# чате — весь текст документа было невозможно прочитать). DejaVu Sans —
+# свободный (Bitstream Vera-like license) TTF-шрифт с полным покрытием
+# кириллицы, его же использует matplotlib по умолчанию. Файлы шрифтов лежат
+# рядом в app/web/fonts/ и регистрируются один раз при импорте модуля.
+_FONTS_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+pdfmetrics.registerFont(TTFont("DejaVuSans", os.path.join(_FONTS_DIR, "DejaVuSans.ttf")))
+pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", os.path.join(_FONTS_DIR, "DejaVuSans-Bold.ttf")))
 
 _INK = colors.HexColor("#1c2230")
 _MUTED = colors.HexColor("#6b7280")
@@ -61,15 +74,15 @@ def build_pdf(title: str, body_text: str, profile: dict | None = None) -> bytes:
     )
 
     title_style = ParagraphStyle(
-        "DocTitle", fontName="Helvetica-Bold", fontSize=14.5, leading=18,
+        "DocTitle", fontName="DejaVuSans-Bold", fontSize=14.5, leading=18,
         alignment=TA_CENTER, textColor=_INK, spaceAfter=18,
     )
     body_style = ParagraphStyle(
-        "DocBody", fontName="Helvetica", fontSize=10.8, leading=16.5,
+        "DocBody", fontName="DejaVuSans", fontSize=10.8, leading=16.5,
         alignment=TA_JUSTIFY, textColor=_INK, spaceAfter=10,
     )
     muted_style = ParagraphStyle(
-        "Muted", fontName="Helvetica", fontSize=9.5, leading=13,
+        "Muted", fontName="DejaVuSans", fontSize=9.5, leading=13,
         alignment=TA_CENTER, textColor=_MUTED,
     )
 
@@ -110,7 +123,7 @@ def _signature_block_pdf(profile: dict | None):
     name = profile.get("signature_name") or profile.get("full_name") or ""
 
     sign_style = ParagraphStyle(
-        "SignLabel", fontName="Helvetica", fontSize=10, leading=14, textColor=_INK,
+        "SignLabel", fontName="DejaVuSans", fontSize=10, leading=14, textColor=_INK,
     )
 
     left = Paragraph(
@@ -137,7 +150,7 @@ def _signature_block_pdf(profile: dict | None):
     if name:
         rows.append(Spacer(1, 4))
         rows.append(Paragraph(_escape(name), ParagraphStyle(
-            "SignName", fontName="Helvetica", fontSize=9.5, leading=12,
+            "SignName", fontName="DejaVuSans", fontSize=9.5, leading=12,
             alignment=2, textColor=_MUTED,  # 2 = TA_RIGHT
         )))
     return rows
