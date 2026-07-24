@@ -1,6 +1,18 @@
 *{box-sizing:border-box; margin:0; padding:0;}
 @media (prefers-reduced-motion: reduce){ *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;} }
 
+/* Приложение — Telegram Mini App с плотной px-вёрсткой (гербы, бейджи,
+   иконки — всё в фиксированных px). Системное "увеличение шрифта" в Chrome
+   на Android масштабирует ТОЛЬКО текстовые узлы, но не эти контейнеры —
+   в результате длинные строки (например "Europe · UEFA Europa League")
+   разваливаются на вертикальный столбик из отдельных слов, а герб/иконки
+   рядом остаются крошечными — карточка матча выглядит сломанной (см.
+   скриншот AI Sport, баг с "CSKA S...", "RSC Ande...", 2026-07).
+   text-size-adjust:100% отключает именно это OS-масштабирование текста, но
+   НЕ трогает pinch-zoom пользователя, поэтому доступность не страдает.
+   ¡Не убирать при рефакторинге! Без этого правила вернётся баг с обрезанными
+   гербами/названиями команд на телефонах с увеличенным системным шрифтом. */
+html{-webkit-text-size-adjust:100%; text-size-adjust:100%;}
 html,body{background:var(--bg); color:var(--text); font-family:var(--font-body); -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;}
 body{max-width:480px; margin:0 auto; min-height:100vh; position:relative; padding-bottom:96px;}
 ::selection{background:var(--ledger-dim); color:var(--ledger);}

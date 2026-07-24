@@ -8,12 +8,14 @@ webapp/src/config/docsApi.js, который уже был написан в р�
 Продакшн (Railway/любой Docker-хостинг):
     uvicorn app.web.server:app --host 0.0.0.0 --port $PORT
 """
+import asyncio
 import logging
 import os
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.web import reminder_worker
 from app.web.api import admin_plans, admin_users, auth, billing, docs, investors, organizations, referrals, sport_routes, telegram_webhook
 from app.web.config import settings
 from app.web.db import get_conn, init_db
@@ -60,6 +62,14 @@ app.include_router(telegram_webhook.router)
 app.include_router(sport_routes.router)
 app.include_router(organizations.router)
 app.include_router(docs.router)
+
+
+@app.on_event("startup")
+async def _start_reminder_worker():
+    # Фоновая задача в том же event loop-е (см. app/web/reminder_worker.py —
+    # почему не отдельный планировщик/процесс). Если TELEGRAM_BOT_TOKEN не
+    # задан, run_forever() сама выходит сразу же, залогировав причину.
+    asyncio.create_task(reminder_worker.run_forever())
 
 
 @app.get("/health")

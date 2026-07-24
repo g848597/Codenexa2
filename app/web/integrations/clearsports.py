@@ -143,6 +143,7 @@ def _map_fixture(raw: dict) -> dict:
     goals_home = first(raw, "home_score", "home_points")
     goals_away = first(raw, "away_score", "away_points")
     return {
+        "id": first(raw, "id", "game_id", "game_key", "match_id"),
         "statusShort": status_short,
         "elapsed": first(raw, "elapsed", "minute"),
         "timestamp": timestamp,
@@ -239,6 +240,23 @@ async def live_matches() -> list[dict]:
             if isinstance(m, dict) and str(first(m, "status", default="")).strip().lower() in ("live", "in_progress"):
                 live.append(_map_fixture(m))
     return live
+
+
+async def league_standings(league_id: str) -> list[dict]:
+    # ClearSports (см. докстринг файла) не документирует отдельный
+    # standings-эндпоинт для соккера — только /games целиком по лиге. Честно
+    # отказываем, а не считаем таблицу "на коленке" из сырых игр под видом
+    # официальных данных провайдера (см. правило проекта: цифры standings/H2H
+    # только из реального API-провайдера).
+    raise SportProviderError("ClearSports не предоставляет турнирную таблицу для соккера", 501)
+
+
+async def head_to_head(team_id: str, opponent_id: str) -> list[dict]:
+    raise SportProviderError("ClearSports не предоставляет очную историю (head-to-head) для соккера", 501)
+
+
+async def match_detail(match_id: str) -> dict:
+    raise SportProviderError("ClearSports не предоставляет карточку одного матча по id для соккера", 501)
 
 
 async def matches_by_date(date_str: str) -> list[dict]:

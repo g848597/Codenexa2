@@ -46,6 +46,7 @@ app/web/            — бэкенд (FastAPI)
   middleware.py        — security-заголовки на каждый ответ
   deps.py             — FastAPI Depends: get_current_user(_optional), get_current_admin, is_admin_user
   docgen.py           — генерация PDF (reportlab) и DOCX (python-docx) из документов
+  reminder_worker.py  — фоновый asyncio-воркер: напоминания о матчах AI Sport через Telegram-бота
   referrals.py        — логика реферальной программы (подтверждение по первой оплате)
   fonts/              — DejaVuSans.ttf/-Bold.ttf — Cyrillic-шрифт для PDF (Helvetica кириллицу не умеет!)
 
@@ -136,7 +137,7 @@ home-экран показывает список разделов (иконка
 `users`, `sessions`, `oauth_links`, `payments`, `plans`, `investors`,
 `admin_audit_log`, `referrals`, `auth_otp_codes`, `organizations`,
 `organization_members`, `organization_invites`, `document_templates`,
-`documents`, `document_profiles`.
+`documents`, `document_profiles`, `sport_favorite_teams`, `sport_match_reminders`.
 
 Схема живёт ЦЕЛИКОМ в одной строке `SCHEMA` в `db.py` (не в Alembic и не в
 отдельных `.sql`-файлах). Для уже развёрнутой БД (когда просто дописали
@@ -179,6 +180,13 @@ live_matches/matches_by_date`) и дописать в список.
 точности ИИ"/ROI/прибыли как маркетинговые цифры. Это осознанное решение
 по итогам обсуждений в истории проекта — **не добавлять фейковую
 статистику точности прогнозов, даже если попросят "как на референсе"**.
+
+Также есть: избранные команды (watchlist, `sport_favorite_teams`),
+напоминания о матче за N минут через Telegram-бота (`sport_match_reminders`
++ `reminder_worker.py`), турнирные таблицы лиг и очная история команд
+(`league_standings`/`head_to_head` — честно: ClearSports эти два эндпоинта
+для футбола не поддерживает и явно отказывает вместо того, чтобы считать
+таблицу "на коленке" из сырых матчей).
 
 ## AI Docs — как устроена генерация файлов
 

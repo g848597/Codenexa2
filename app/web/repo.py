@@ -1016,3 +1016,96 @@ def set_document_profile_file(user_id: int, kind: str, path: str | None):
         return row_to_dict(conn.execute(
             "SELECT * FROM document_profiles WHERE user_id = ?", (user_id,)
         ).fetchone())
+
+
+# --- AI Sport: избранные команды (watchlist) --------------------------------
+
+def list_favorite_teams(user_id: int):
+    return _fetch_all(
+        "SELECT * FROM sport_favorite_teams WHERE user_id = ? ORDER BY created_at DESC",
+        (user_id,),
+    )
+
+
+def get_favorite_team_ids(user_id: int) -> set[str]:
+    """Только id команд — используется в sport_routes.matches(), чтобы
+    поднять матчи избранных команд наверх дня, не таща лишние поля."""
+    rows = _fetch_all("SELECT team_id FROM sport_favorite_teams WHERE user_id = ?", (user_id,))
+    return {r["team_id"] for r in rows}
+
+
+def add_favorite_team(user_id: int, team_id: str, team_name: str, team_logo: str | None):
+    with tx() as conn:
+        conn.execute(
+            "INSERT INTO sport_favorite_teams (user_id, team_id, team_name, team_logo) "
+            "VALUES (?, ?, ?, ?) ON CONFLICT (user_id, team_id) DO UPDATE SET "
+            "team_name = EXCLUDED.team_name, team_logo = EXCLUDED.team_logo",
+            (user_id, str(team_id), team_name or "", team_logo),
+        )
+        return row_to_dict(conn.execute(
+            "SELECT * FROM sport_favorite_teams WHERE user_id = ? AND team_id = ?",
+            (user_id, str(team_id)),
+        ).fetchone())
+
+
+def remove_favorite_team(user_id: int, team_id: str):
+    with tx() as conn:
+        conn.execute(
+            "DELETE FROM sport_favorite_teams WHERE user_id = ? AND team_id = ?",
+            (user_id, str(team_id)),
+        )
+
+
+# --- AI Sport: напоминания о матче (Telegram) -------------------------------
+
+def create_match_reminder(user_id: int, match_id: str, home_name: str, away_name: str,
+                           match_timestamp: int, minutes_before: int):
+    with tx() as conn:
+        conn.execute(
+            "INSERT INTO sport_match_reminders "
+            "(user_id, match_id, home_name, away_name, match_timestamp, minutes_before) "
+            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (user_id, match_id) DO UPDATE SET "
+            "minutes_before = EXCLUDED.minutes_before, match_timestamp = EXCLUDED.match_timestamp, "
+            "sent = FALSE",
+            (user_id, str(match_id), home_name or "", away_name or "", match_timestamp, minutes_before),
+        )
+        return row_to_dict(conn.execute(
+            "SELECT * FROM sport_match_reminders WHERE user_id = ? AND match_id = ?",
+            (user_id, str(match_id)),
+        ).fetchone())
+
+
+def list_match_reminders(user_id: int):
+    return _fetch_all(
+        "SELECT * FROM sport_match_reminders WHERE user_id = ? AND sent = FALSE "
+        "ORDER BY match_timestamp ASC",
+        (user_id,),
+    )
+
+
+def cancel_match_reminder(user_id: int, match_id: str):
+    with tx() as conn:
+        conn.execute(
+            "DELETE FROM sport_match_reminders WHERE user_id = ? AND match_id = ?",
+            (user_id, str(match_id)),
+        )
+
+
+def due_match_reminders(now_ts: int):
+    """Напоминания, чьё окно "за N минут до матча" уже наступило и ещё не
+    отправлено. Используется фоновым воркером (см. app/web/server.py:
+    _reminder_worker). Джойн на users — нужен telegram_id, чтобы было куда
+    слать сообщение; без telegram_id (вход по email/паролю) — честно не
+    отправляем и не пытаемся притвориться, что письмо ушло."""
+    return _fetch_all(
+        "SELECT sport_match_reminders.*, users.telegram_id AS telegram_id "
+        "FROM sport_match_reminders JOIN users ON users.id = sport_match_reminders.user_id "
+        "WHERE sport_match_reminders.sent = FALSE "
+        "AND sport_match_reminders.match_timestamp - (sport_match_reminders.minutes_before * 60) <= ?",
+        (now_ts,),
+    )
+
+
+def mark_reminder_sent(reminder_id: int):
+    with tx() as conn:
+        conn.execute("UPDATE sport_match_reminders SET sent = TRUE WHERE id = ?", (reminder_id,))

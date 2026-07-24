@@ -180,6 +180,11 @@ def _map_fixture(raw: dict) -> dict:
     goals_home = _first(score, "home") if score else _first(raw, "goals_home", "home_score", "home_goals")
     goals_away = _first(score, "away") if score else _first(raw, "goals_away", "away_score", "away_goals")
     return {
+        # "id" — раньше не мапился вовсе: у самого матча/фикстуры не было
+        # идентификатора нигде во фронтенде, поэтому нельзя было ни открыть
+        # отдельный экран матча (GET /matches/{id}), ни привязать напоминание
+        # к конкретной игре. Команды (home/away) свой id уже имели.
+        "id": _first(raw, "id", "match_id", "fixture_id"),
         "statusShort": status_short,
         "elapsed": _first(raw, "elapsed", "minute"),
         # "date_unix" — реальное имя поля у footballdata.io (см. пример ответа
@@ -247,6 +252,61 @@ async def live_matches() -> list[dict]:
     data = await _get("/fixtures/live")
     raw_matches = data.get("data") or data.get("matches") or []
     return [_map_fixture(m) for m in raw_matches if isinstance(m, dict)]
+
+
+def _map_standing_row(raw: dict) -> dict:
+    return {
+        "position": _first(raw, "position", "rank"),
+        "team": _map_team_ref(raw.get("team") if isinstance(raw.get("team"), dict) else raw),
+        "played": _first(raw, "played", "played_games", "matches"),
+        "won": _first(raw, "won", "wins"),
+        "draw": _first(raw, "draw", "draws", "drawn"),
+        "lost": _first(raw, "lost", "losses"),
+        "goalsFor": _first(raw, "goals_for", "goalsFor", "goals_scored"),
+        "goalsAgainst": _first(raw, "goals_against", "goalsAgainst", "goals_conceded"),
+        "points": _first(raw, "points"),
+        "form": _first(raw, "form"),
+    }
+
+
+# GET /leagues/{league_id}/standings — см.
+# https://footballdata.io/documentation/endpoints/ (раздел Leagues). Раньше
+# в проекте вообще не было кода, который бы его вызывал — турнирная таблица
+# нигде не показывалась, хотя эндпоинт у провайдера реально существует.
+async def league_standings(league_id: str) -> list[dict]:
+    data = await _get(f"/leagues/{league_id}/standings", cache_key=f"standings:{league_id}")
+    raw = data.get("data")
+    if isinstance(raw, dict):
+        raw_rows = raw.get("standings") or raw.get("table") or []
+    elif isinstance(raw, list):
+        raw_rows = raw
+    else:
+        raw_rows = data.get("standings") or data.get("table") or []
+    return [_map_standing_row(r) for r in raw_rows if isinstance(r, dict)]
+
+
+# GET /teams/{team_id}/h2h/{opponent_id} — см. документацию, раздел Teams.
+# Как и standings(), этот эндпоинт документирован у провайдера, но раньше
+# в проекте не было ни строчки кода, которая бы к нему обращалась.
+async def head_to_head(team_id: str, opponent_id: str) -> list[dict]:
+    data = await _get(f"/teams/{team_id}/h2h/{opponent_id}", cache_key=f"h2h:{team_id}:{opponent_id}")
+    raw = data.get("data")
+    if isinstance(raw, dict):
+        raw_matches = raw.get("matches") or []
+    elif isinstance(raw, list):
+        raw_matches = raw
+    else:
+        raw_matches = data.get("matches") or []
+    return [_map_fixture(m) for m in raw_matches if isinstance(m, dict)]
+
+
+# GET /matches/{match_id} — детальная карточка одного матча (составы отдельно
+# не показываем — footballdata.io их не документирует под свободный тариф,
+# но odds/probabilities/статус уже приходят тем же _map_fixture).
+async def match_detail(match_id: str) -> dict:
+    data = await _get(f"/matches/{match_id}", cache_key=f"match:{match_id}")
+    raw = data.get("data") if isinstance(data.get("data"), dict) else data.get("match") if isinstance(data.get("match"), dict) else data
+    return _map_fixture(raw)
 
 
 async def matches_by_date(date_str: str) -> list[dict]:

@@ -18,6 +18,98 @@ let screenStack = [{ name: 'home' }];
 let apiConfigured = null; // null = ещё не проверено
 let liveCount = 0;
 
+// Избранные команды (watchlist) — id команд, к которым привязан вход. Не
+// загружено (favoritesLoaded=false) — звёздочки просто не рисуем, а не
+// показываем их все "невыбранными" (не хотим лгать пустым состоянием).
+let favoriteIds = new Set();
+let favoritesLoaded = false;
+// hasTelegram — определяет, можно ли вообще предлагать напоминания о матче:
+// шлёт их только Telegram-бот (см. app/web/reminder_worker.py), у входа по
+// email/паролю нет чата, куда слать сообщение.
+let hasTelegram = false;
+
+async function loadFavoritesAndAuth() {
+  try {
+    const [favData, meData] = await Promise.all([
+      sportApi.favorites(),
+      authApi.me(),
+    ]);
+    favoriteIds = new Set((favData.teams || []).map((t) => String(t.teamId)));
+    favoritesLoaded = true;
+    hasTelegram = !!(meData && meData.user && meData.user.hasTelegram);
+  } catch {
+    // 401 (гость/не вошёл) — это ожидаемо, не ошибка экрана: просто не
+    // показываем звёздочки/напоминания, весь остальной раздел работает как есть.
+    favoriteIds = new Set();
+    favoritesLoaded = false;
+    hasTelegram = false;
+  }
+  render();
+}
+
+function isFavoriteTeam(id) {
+  return id != null && favoriteIds.has(String(id));
+}
+
+async function toggleFavoriteTeam(team) {
+  const id = String(team.id ?? '');
+  if (!id) return;
+  haptic('light');
+  if (isFavoriteTeam(id)) {
+    favoriteIds.delete(id);
+    render();
+    try { await sportApi.removeFavorite(id); } catch { favoriteIds.add(id); render(); }
+  } else {
+    favoriteIds.add(id);
+    render();
+    try { await sportApi.addFavorite(id, team.name || '', team.logo || null); } catch { favoriteIds.delete(id); render(); }
+  }
+}
+
+// Звёздочка избранного — намеренно <span data-fav-toggle>, а не <button>:
+// она рисуется внутри карточки команды, которая сама уже целиком кликабельна
+// (data-team-click) — вложенные <button> внутри <button> невалидны в HTML.
+// Клик по звезде останавливает всплытие (см. wireFavoriteToggles), поэтому
+// поведение для пользователя не отличается от обычной кнопки.
+function favoriteStarHTML(team) {
+  if (!favoritesLoaded) return '';
+  const active = isFavoriteTeam(team.id);
+  return `<span class="sa-fav-toggle ${active ? 'sa-fav-active' : ''}" data-fav-toggle data-id="${team.id ?? ''}" data-name="${esc(team.name ?? '')}" data-logo="${esc(team.logo ?? '')}" role="button" aria-pressed="${active}" aria-label="В избранное">${icon('star')}</span>`;
+}
+
+function wireFavoriteToggles() {
+  root.querySelectorAll('[data-fav-toggle]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!favoritesLoaded) return; // гость — тап по звезде молча игнорируем, а не роняем ошибкой
+      toggleFavoriteTeam({ id: el.dataset.id, name: el.dataset.name, logo: el.dataset.logo || null });
+    });
+  });
+}
+
+// --- Скелетоны загрузки (тот же паттерн, что investors.js/docsHome.css:
+// shimmer-заглушки вместо спиннера на месте будущих карточек) -------------
+
+function teamGridSkeletonHTML(count = 6) {
+  return `<div class="sa-team-grid">${Array.from({ length: count }, () => `
+    <div class="sa-skel sa-skel-team">
+      <div class="sa-skel-crest"></div>
+      <div class="sa-skel-line w70"></div>
+    </div>`).join('')}</div>`;
+}
+
+function fixtureListSkeletonHTML(count = 3) {
+  return `<div class="sa-fixture-list">${Array.from({ length: count }, () => `
+    <div class="sa-skel sa-skel-fixture">
+      <div class="sa-skel-line w40"></div>
+      <div class="sa-skel-row">
+        <div class="sa-skel-crest sm"></div>
+        <div class="sa-skel-line w20"></div>
+        <div class="sa-skel-crest sm"></div>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
 // --- Утилиты -------------------------------------------------------------
 
 function push(name, params = {}) {
@@ -188,8 +280,13 @@ function fixtureRowHTML(f) {
   // в гостевую (а если на странице команды текущий клуб как раз был "дома",
   // клик вообще никуда не вёл — открывал ту же самую карточку). Теперь дом и
   // гости — две отдельные кнопки, каждая ведёт на свою команду.
+  // data-match — только если у фикстуры реально есть id (раньше матчи вообще
+  // не несли id, экрана "один матч" не существовало, см. footballdata.py:
+  // _map_fixture). Клик по карточке (кроме вложенных кнопок — команда/
+  // прогноз) открывает экран матча (см. wireCommon: root.querySelectorAll('[data-match]')).
+  const matchAttr = f.id != null ? `data-match="${esc(String(f.id))}"` : '';
   return `
-  <div class="sa-fixture sa-fixture-${cls}">
+  <div class="sa-fixture sa-fixture-${cls}" ${matchAttr}>
     <div class="sa-fixture-status">${statusBadge(f)}${fixtureMetaHTML(f)}</div>
     <div class="sa-fixture-main">
       <button class="sa-fixture-team" data-team="${f.home.id ?? ''}">${crestHTML(f.home, 'md')}<span class="sa-fixture-team-name">${esc(f.home.name)}</span></button>
@@ -222,8 +319,12 @@ export function openSportApp() {
   dayMatches = { day: 0, revealed: false, matches: null, dayLocked: false, total: 0, predictedCount: 0, loaded: false, error: null };
   plansState = { plans: null };
   searchState = { query: '', results: null, loading: false, error: null };
+  favoriteIds = new Set();
+  favoritesLoaded = false;
+  hasTelegram = false;
   render();
   refreshLiveBadge();
+  loadFavoritesAndAuth();
 }
 
 export function closeSportApp() {
@@ -262,6 +363,8 @@ function render() {
     case 'search': inner = renderSearch(screen.params); break;
     case 'team': inner = renderTeam(screen.params); break;
     case 'live': inner = renderLive(); break;
+    case 'match': inner = renderMatch(screen.params); break;
+    case 'standings': inner = renderStandings(screen.params); break;
     default: inner = renderHome();
   }
 
@@ -290,6 +393,7 @@ function render() {
 
   wireCommon();
   wireImageFallbacks();
+  wireFavoriteToggles();
   wireScreen(screen);
 }
 
@@ -305,6 +409,20 @@ function wireCommon() {
       if (!id || id === 'null' || id === 'undefined') return;
       haptic('light');
       push('team', { id });
+    });
+  });
+
+  // Тап по карточке матча открывает экран одного матча (составы недоступны у
+  // источника, но H2H/коэффициенты/прогноз собраны вместе — см. renderMatch).
+  // Клики по вложенным кнопкам (команда, заблокированный прогноз) не должны
+  // ЕЩЁ и открывать экран матча поверх — проверяем closest('button').
+  root.querySelectorAll('[data-match]').forEach((card) => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      const id = card.dataset.match;
+      if (!id) return;
+      haptic('light');
+      push('match', { id });
     });
   });
 
@@ -351,10 +469,11 @@ function renderHome() {
   const grid = homeState.error
     ? errorHTML(homeState.error)
     : !homeState.popular
-      ? loadingHTML('Загружаю команды…')
+      ? teamGridSkeletonHTML(6)
       : `<div class="sa-team-grid">
           ${homeState.popular.map((t) => `
             <button class="sa-team-card" data-team-click data-id="${t.id ?? ''}" data-name="${esc(t.name)}">
+              ${favoriteStarHTML(t)}
               ${crestHTML(t, 'lg')}
               <span class="sa-team-card-name">${esc(t.name)}</span>
               ${t.country ? `<span class="sa-team-card-country">${esc(t.country)}</span>` : ''}
@@ -398,14 +517,20 @@ function renderHome() {
   } else if (dayMatches.error) {
     dayBody = errorHTML(dayMatches.error);
   } else if (!dayMatches.loaded) {
-    dayBody = loadingHTML('Загружаю матчи…');
+    dayBody = fixtureListSkeletonHTML(3);
   } else if (dayMatches.dayLocked) {
-    dayBody = `
-    <div class="sa-upsell" data-open-pro>
-      ${icon('lock')} Этот день закрыт на тарифе «${esc(tierState.tierTitle)}» — откройте в тарифе выше
-    </div>`;
+    dayBody = lockedDayUpsellHTML(dayMatches.day);
   } else if (!dayMatches.matches || !dayMatches.matches.length) {
-    dayBody = `<div class="sa-empty-mini">${DAY_LABELS[dayMatches.day]}: матчей по отслеживаемым лигам не найдено.</div>`;
+    // Честное пустое состояние: бесплатный тариф footballdata.io физически
+    // покрывает только 5 лиг — если в отслеживаемых лигах в этот день нет
+    // матчей, это ограничение источника данных, а не баг. Явно объясняем,
+    // а не оставляем пустой блок без причины.
+    dayBody = `
+    <div class="sa-empty-honest">
+      <span class="sa-empty-honest-icon">${icon('calendar')}</span>
+      <p><strong>${DAY_LABELS[dayMatches.day]}:</strong> в отслеживаемых лигах матчей не найдено.</p>
+      <p class="sa-empty-honest-sub">Бесплатный источник данных покрывает 5 топ-лиг — если в них в этот день пусто, это ограничение самого источника, а не сбой раздела. Загляните в другой день.</p>
+    </div>`;
   } else {
     const hiddenPred = dayMatches.total > 0 ? Math.max(0, dayMatches.matches.filter((f) => f.statusShort === 'NS').length - dayMatches.predictedCount) : 0;
     dayBody = `<div class="sa-fixture-list">${dayMatches.matches.map(fixtureRowHTML).join('')}</div>
@@ -592,18 +717,52 @@ function wireHome() {
 
   root.querySelectorAll('[data-day]').forEach((btn) => btn.addEventListener('click', () => {
     const day = Number(btn.dataset.day);
-    if (btn.hasAttribute('data-day-locked')) {
-      // День вне тарифа — не грузим ничего, сразу ведём на тарифы, чтобы не
-      // притворяться, будто там просто "пока нет матчей".
-      haptic('light');
-      closeSportApp();
-      document.querySelector('.tab[data-view="account"]')?.click();
-      return;
-    }
     haptic('light');
+    // Залоченный день теперь не уводит сразу на тарифы — показывает явную
+    // подсказку "что купить и почём" на месте (см. lockedDayUpsellHTML),
+    // чтобы тап был понятен сам по себе, а не выглядел как ничего не делающая
+    // кнопка. loadDayMatches() всё равно уйдёт на бэкенд и честно получит
+    // dayLocked:true — сам список матчей за пределами тарифа не запрашивается.
     if (!dayMatches.revealed || day !== dayMatches.day) loadDayMatches(day);
   }));
 
+}
+
+// Тариф, необходимый для конкретного дня (day=0..3), совпадает по порядку с
+// TIER_ORDER на бэкенде (free/start/pro/business — см. sport_common.py:
+// TIER_RULES, days:1/2/3/4) — день с индексом i открывается ровно тарифом
+// с тем же индексом в TIER_ORDER.
+const TIER_ORDER = ['free', 'start', 'pro', 'business'];
+
+function lockedDayUpsellHTML(day) {
+  const neededTier = TIER_ORDER[day] || 'business';
+  const plans = plansState.plans || [];
+  const tierOf = (code) => String(code || '').split('_')[0];
+  const plan = plans.find((p) => tierOf(p.code) === neededTier);
+  const TIER_TITLES = { start: 'Старт', pro: 'Про', business: 'Бизнес' };
+  const title = TIER_TITLES[neededTier] || neededTier;
+
+  if (!plan) {
+    // Тарифы ещё не загрузились/не пришли — не выдумываем цену, честно
+    // ведём на полный список тарифов вместо неверного числа на экране.
+    return `
+    <button class="sa-upsell" data-open-pro>
+      ${icon('lock')} Этот день открывается тарифом «${esc(title)}» — посмотреть тарифы
+    </button>`;
+  }
+  return `
+  <div class="sa-lock-upsell">
+    <div class="sa-lock-upsell-row">
+      <span class="sa-lock-upsell-icon">${icon('lock')}</span>
+      <div>
+        <div class="sa-lock-upsell-title">Откройте тариф «${esc(title)}»</div>
+        <div class="sa-lock-upsell-sub">Этот день и матчи по нему видны только с этого тарифа и выше</div>
+      </div>
+    </div>
+    <button class="sa-btn-primary sa-lock-upsell-cta" data-plan-code="${esc(plan.code)}">
+      ${icon('crown')} Оформить за $${esc(plan.usd)} <em>· ${esc(String(plan.stars))} ${icon('star')}</em>
+    </button>
+  </div>`;
 }
 
 function openSportPlanCheckout(planCode) {
@@ -639,7 +798,7 @@ function renderSearch(params) {
   }
 
   let body;
-  if (searchState.loading) body = loadingHTML('Ищу команды…');
+  if (searchState.loading) body = teamGridSkeletonHTML(6);
   else if (searchState.error) body = errorHTML(searchState.error);
   else if (searchState.results && searchState.results.length === 0) {
     body = `<div class="sa-empty"><p>По запросу «${esc(searchState.query)}» ничего не нашлось.</p></div>`;
@@ -647,13 +806,14 @@ function renderSearch(params) {
     body = `<div class="sa-team-grid">
       ${searchState.results.map((t) => `
         <button class="sa-team-card" data-team-click data-id="${t.id}" data-name="${esc(t.name)}">
+          ${favoriteStarHTML(t)}
           ${crestHTML(t, 'lg')}
           <span class="sa-team-card-name">${esc(t.name)}</span>
           ${t.country ? `<span class="sa-team-card-country">${esc(t.country)}</span>` : ''}
         </button>`).join('')}
     </div>`;
   } else {
-    body = loadingHTML();
+    body = teamGridSkeletonHTML(6);
   }
 
   return `
@@ -742,6 +902,10 @@ function renderTeam(params) {
       ${t.country ? `<span>${esc(t.country)}</span>` : ''}
       ${t.founded ? `<span>· Основан в ${t.founded}</span>` : ''}
     </div>
+    ${favoritesLoaded ? `
+    <button class="sa-fav-hero-btn ${isFavoriteTeam(t.id) ? 'sa-fav-active' : ''}" data-fav-toggle data-id="${t.id ?? ''}" data-name="${esc(t.name ?? '')}" data-logo="${esc(t.logo ?? '')}">
+      ${icon('star')} ${isFavoriteTeam(t.id) ? 'В избранном' : 'В избранное'}
+    </button>` : ''}
   </div>
 
   ${t.venue && t.venue.name ? `
@@ -840,6 +1004,196 @@ function wireLive() {
 }
 
 // =========================================================================
+// Экран: один матч (составы недоступны у источника — H2H/коэффициенты/
+// прогноз/напоминание собраны вместе, см. app/web/api/sport_routes.py:
+// match_detail())
+// =========================================================================
+
+let matchState = { id: null, data: null, error: null, reminderMinutes: null, reminderBusy: false };
+
+const REMINDER_OPTIONS = [15, 30, 60];
+
+function h2hSummaryHTML(h2h, homeId) {
+  if (!h2h || !h2h.length) {
+    return `<div class="sa-empty-mini">Очных встреч в доступной истории источника не найдено.</div>`;
+  }
+  return `<div class="sa-fixture-list">${h2h.slice(0, 5).map((f) => fixtureRowHTML(f)).join('')}</div>`;
+}
+
+function reminderPanelHTML(m) {
+  if (m.statusShort !== 'NS' || !m.timestamp) return '';
+  if (!hasTelegram) {
+    // Без Telegram отправлять некуда (см. app/web/reminder_worker.py) — не
+    // прячем фичу молча, а честно объясняем, чего не хватает.
+    return `
+    <div class="sa-reminder-block">
+      <div class="sa-reminder-title">${icon('bell')} Напоминание о матче</div>
+      <p class="sa-reminder-hint">Напоминания приходят в Telegram-бота — войдите через Telegram, чтобы их получать.</p>
+    </div>`;
+  }
+  const active = matchState.reminderMinutes;
+  return `
+  <div class="sa-reminder-block">
+    <div class="sa-reminder-title">${icon('bell')} Напомнить о начале</div>
+    <div class="sa-reminder-chips">
+      ${REMINDER_OPTIONS.map((min) => `
+        <button class="sa-reminder-chip ${active === min ? 'active' : ''}" data-reminder-min="${min}" ${matchState.reminderBusy ? 'disabled' : ''}>
+          за ${min} мин
+        </button>`).join('')}
+    </div>
+    ${active ? `<div class="sa-reminder-active-hint">${icon('checkCircle')} Пришлём в Telegram за ${active} мин до начала</div>` : ''}
+  </div>`;
+}
+
+function renderMatch(params) {
+  if (params.id !== matchState.id) {
+    matchState = { id: params.id, data: null, error: null, reminderMinutes: null, reminderBusy: false };
+  }
+  if (!matchState.data && !matchState.error) {
+    loadMatchAsync(params.id);
+  }
+
+  if (matchState.error) return errorHTML(matchState.error);
+  if (!matchState.data) return fixtureListSkeletonHTML(1);
+
+  const m = matchState.data.match;
+  const h2h = matchState.data.h2h;
+
+  return `
+  <div class="sa-fixture sa-fixture-${matchStatusClass(m)} sa-match-hero-card">
+    <div class="sa-fixture-status">${statusBadge(m)}${fixtureMetaHTML(m)}</div>
+    <div class="sa-fixture-main">
+      <button class="sa-fixture-team" data-team="${m.home.id ?? ''}">${crestHTML(m.home, 'lg')}<span class="sa-fixture-team-name">${esc(m.home.name)}</span></button>
+      <div class="sa-fixture-score-block">${scoreOrTimeHTML(m)}</div>
+      <button class="sa-fixture-team sa-fixture-team-away" data-team="${m.away.id ?? ''}"><span class="sa-fixture-team-name">${esc(m.away.name)}</span>${crestHTML(m.away, 'lg')}</button>
+    </div>
+    ${predictionChipHTML(m)}
+    ${oddsStripHTML(m)}
+  </div>
+
+  ${m.league && m.league.id ? `
+  <button class="sa-link-btn sa-standings-link" data-standings-link="${esc(String(m.league.id))}" data-standings-name="${esc(m.league.name || '')}">
+    ${icon('trophy')} Турнирная таблица «${esc(m.league.name || 'лиги')}» ${icon('arrowRight')}
+  </button>` : ''}
+
+  ${reminderPanelHTML(m)}
+
+  <div class="sa-section-head"><h2>Очные встречи</h2></div>
+  ${h2hSummaryHTML(h2h, m.home.id)}
+  `;
+}
+
+async function loadMatchAsync(id) {
+  try {
+    const [data, remindersData] = await Promise.all([
+      sportApi.matchDetail(id),
+      hasTelegram ? sportApi.reminders().catch(() => ({ reminders: [] })) : Promise.resolve({ reminders: [] }),
+    ]);
+    const existing = (remindersData.reminders || []).find((r) => String(r.matchId) === String(id));
+    matchState = { id, data, error: null, reminderMinutes: existing ? existing.minutesBefore : null, reminderBusy: false };
+    render();
+  } catch (e) {
+    matchState = { id, data: null, error: e.message, reminderMinutes: null, reminderBusy: false };
+    render();
+  }
+}
+
+async function toggleReminder(minutes) {
+  const m = matchState.data && matchState.data.match;
+  if (!m) return;
+  haptic('medium');
+  matchState = { ...matchState, reminderBusy: true };
+  render();
+  try {
+    if (matchState.reminderMinutes === minutes) {
+      await sportApi.cancelReminder(matchState.id);
+      matchState = { ...matchState, reminderMinutes: null, reminderBusy: false };
+    } else {
+      await sportApi.createReminder(matchState.id, m.home.name, m.away.name, m.timestamp, minutes);
+      matchState = { ...matchState, reminderMinutes: minutes, reminderBusy: false };
+    }
+  } catch (e) {
+    matchState = { ...matchState, reminderBusy: false };
+    // Тихий откат — сообщение об ошибке здесь было бы избыточным поверх и
+    // так заметного отсутствия смены состояния чипа; повторный тап сработает.
+  }
+  render();
+}
+
+function wireMatch() {
+  root.querySelectorAll('[data-reminder-min]').forEach((btn) => {
+    btn.addEventListener('click', () => toggleReminder(Number(btn.dataset.reminderMin)));
+  });
+  const standingsBtn = root.querySelector('[data-standings-link]');
+  if (standingsBtn) standingsBtn.addEventListener('click', () => {
+    haptic('light');
+    push('standings', { id: standingsBtn.dataset.standingsLink, name: standingsBtn.dataset.standingsName });
+  });
+}
+
+// =========================================================================
+// Экран: турнирная таблица лиги (реальные данные, см.
+// app/web/integrations/footballdata.py: league_standings — ClearSports
+// такого эндпоинта не документирует и честно отвечает ошибкой, а не
+// подставляет вычисленные "на коленке" цифры)
+// =========================================================================
+
+let standingsState = { id: null, name: '', rows: null, error: null };
+
+function renderStandings(params) {
+  if (params.id !== standingsState.id) {
+    standingsState = { id: params.id, name: params.name || '', rows: null, error: null };
+  }
+  if (!standingsState.rows && !standingsState.error) {
+    loadStandingsAsync(params.id);
+  }
+
+  let body;
+  if (standingsState.error) body = errorHTML(standingsState.error);
+  else if (!standingsState.rows) body = fixtureListSkeletonHTML(4);
+  else if (!standingsState.rows.length) {
+    body = `<div class="sa-empty"><p>Таблица для этой лиги пока не отдаётся источником данных.</p></div>`;
+  } else {
+    body = `
+    <div class="sa-standings-table">
+      <div class="sa-standings-head">
+        <span class="sa-standings-pos">#</span>
+        <span class="sa-standings-team">Команда</span>
+        <span>И</span><span>О</span><span>РМ</span><span class="sa-standings-pts">О́</span>
+      </div>
+      ${standingsState.rows.map((r) => `
+        <div class="sa-standings-row">
+          <span class="sa-standings-pos">${r.position ?? '–'}</span>
+          <span class="sa-standings-team">${crestHTML(r.team, 'sm')}<span>${esc(r.team.name)}</span></span>
+          <span>${r.played ?? '–'}</span>
+          <span>${r.won ?? '–'}</span>
+          <span>${(r.goalsFor != null && r.goalsAgainst != null) ? (r.goalsFor - r.goalsAgainst) : '–'}</span>
+          <span class="sa-standings-pts">${r.points ?? '–'}</span>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  return `
+  <h2 class="sa-h2">${icon('trophy')} ${esc(standingsState.name || 'Турнирная таблица')}</h2>
+  ${body}`;
+}
+
+async function loadStandingsAsync(leagueId) {
+  try {
+    const data = await sportApi.leagueStandings(leagueId);
+    standingsState = { ...standingsState, id: leagueId, rows: data.standings || [], error: null };
+    render();
+  } catch (e) {
+    standingsState = { ...standingsState, id: leagueId, rows: null, error: e.message };
+    render();
+  }
+}
+
+function wireStandings() {
+  // Кнопка "Повторить" обрабатывается централизованно в wireRetry().
+}
+
+// =========================================================================
 // Диспетчер обработчиков конкретного экрана
 // =========================================================================
 
@@ -849,6 +1203,8 @@ function wireScreen(screen) {
     case 'search': wireSearch(); break;
     case 'team': wireTeam(); break;
     case 'live': wireLive(); break;
+    case 'match': wireMatch(); break;
+    case 'standings': wireStandings(); break;
   }
   wireRetry(screen);
 }
@@ -864,6 +1220,8 @@ function wireRetry(screen) {
     else if (screen.name === 'search') searchState = { ...searchState, results: null, loading: false, error: null };
     else if (screen.name === 'team') teamState = { id: null, team: null, matches: null, error: null };
     else if (screen.name === 'live') liveState = { matches: null, loading: false, error: null, configured: null };
+    else if (screen.name === 'match') matchState = { id: null, data: null, error: null, reminderMinutes: null, reminderBusy: false };
+    else if (screen.name === 'standings') standingsState = { id: null, name: '', rows: null, error: null };
     render();
   });
 }

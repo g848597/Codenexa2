@@ -509,6 +509,44 @@ CREATE TABLE IF NOT EXISTS document_profiles (
     pdf_theme TEXT NOT NULL DEFAULT 'classic',
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- AI Sport: избранные команды пользователя (watchlist). Название/герб
+-- сохраняются "снимком" на момент добавления (team_name/team_logo) — это
+-- ускоряет отрисовку списка избранного без похода во внешний источник
+-- данных на каждое открытие раздела; сама команда (team_id) остаётся
+-- ссылкой на реального провайдера (footballdata.io/clearsports), с ней и
+-- так дальше делаются реальные запросы matches/detail при заходе в карточку.
+CREATE TABLE IF NOT EXISTS sport_favorite_teams (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    team_id TEXT NOT NULL,
+    team_name TEXT NOT NULL DEFAULT '',
+    team_logo TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sport_fav_user_team ON sport_favorite_teams(user_id, team_id);
+CREATE INDEX IF NOT EXISTS idx_sport_fav_user ON sport_favorite_teams(user_id, created_at DESC);
+
+-- AI Sport: напоминания о матче ("за N минут до начала") для избранных
+-- команд — реальная фича через уже существующего Telegram-бота (см.
+-- app/web/api/telegram_webhook.py, app/web/integrations/stars.py: тот же
+-- API_BASE/TELEGRAM_BOT_TOKEN). match_timestamp хранится отдельно от
+-- отправки: бэкенд не умеет запрашивать "матч по id" без похода к внешнему
+-- провайдеру на каждую проверку, поэтому время матча фиксируется в момент
+-- создания напоминания (snapshot), а не пересчитывается на лету.
+CREATE TABLE IF NOT EXISTS sport_match_reminders (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    match_id TEXT NOT NULL,
+    home_name TEXT NOT NULL DEFAULT '',
+    away_name TEXT NOT NULL DEFAULT '',
+    match_timestamp BIGINT NOT NULL,
+    minutes_before INTEGER NOT NULL DEFAULT 30,
+    sent BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sport_reminder_user_match ON sport_match_reminders(user_id, match_id);
+CREATE INDEX IF NOT EXISTS idx_sport_reminder_due ON sport_match_reminders(sent, match_timestamp);
 """
 
 

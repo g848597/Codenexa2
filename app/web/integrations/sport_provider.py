@@ -77,6 +77,23 @@ async def matches_by_date(date_str: str) -> list[dict]:
     return result or []
 
 
+async def league_standings(league_id: str) -> list[dict]:
+    result = await _call("league_standings", league_id)
+    return result or []
+
+
+async def head_to_head(team_id: str, opponent_id: str) -> list[dict]:
+    result = await _call("head_to_head", team_id, opponent_id)
+    return result or []
+
+
+async def match_detail(match_id: str) -> dict:
+    result = await _call("match_detail", match_id)
+    if result is None:
+        raise SportProviderError("Ни один источник данных не настроен", 503)
+    return result
+
+
 async def predict_matches(fixtures: list[dict]) -> dict:
     """Прогнозы (см. predictions.py) для переданного списка матчей — вызывающий
     код (sport_routes.py) сам решает, сколько матчей входит в квоту тарифа и
