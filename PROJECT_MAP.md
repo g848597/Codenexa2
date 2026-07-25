@@ -145,7 +145,29 @@ home-экран показывает список разделов (иконка
 файле, он применяется отдельно через `ALTER TABLE ... ADD COLUMN IF NOT
 EXISTS` при каждом старте.
 
-## Тарифы и подписка (важно, чтобы не наступить дважды)
+## Оплата — способы
+
+Кроме CryptoBot (автоматическое подтверждение вебхуком) и Telegram Stars,
+есть **ручные способы**: перевод на карту и перевод крипты на кошелёк
+"вручную" — их подтверждает админ через `/api/billing/admin/manual-payments`
+(список ожидающих) → `.../confirm`. Реквизиты — переменные окружения
+`MANUAL_CARD_*`/`MANUAL_WALLET_*` в `config.py`, по умолчанию плейсхолдеры
+("0000 0000 0000 0000") — **обязательно задать реальные перед продакшеном**.
+UI оплаты — `webapp/src/components/paymentPage.js` (полноэкранная страница,
+открывается и из AI Sport, и из AI Docs) — не путать с
+`planCheckoutModal.js` (старое мини-окно, тоже ещё используется местами,
+оба ходят в один и тот же `/api/billing/checkout`).
+
+## Привязка Telegram к аккаунту (email/Google/Яндекс пользователи)
+
+`webapp/src/components/telegramLinkBanner.js` — баннер "привяжите Telegram",
+показывается после входа, если у пользователя ещё нет `telegram_id` и он не
+нажимал "не показывать больше" (`users.telegram_prompt_dismissed`). Нужно
+это в первую очередь для напоминаний о матчах (`reminder_worker.py` шлёт
+через бота, а значит требует `telegram_id`). Роуты — `/api/auth/telegram/link`
+и `/api/auth/telegram/dismiss-prompt` в `auth.py`.
+
+
 
 - Коды тарифов: `start_monthly`, `pro_monthly`, `pro_yearly`,
   `business_monthly`, `business_yearly`. **Код тарифа ДОЛЖЕН начинаться

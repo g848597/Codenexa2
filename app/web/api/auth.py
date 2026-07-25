@@ -103,6 +103,7 @@ def _public_user(user: dict) -> dict:
         "hasGoogle": bool(user.get("google_id")),
         "hasYandex": bool(user.get("yandex_id")),
         "hasPassword": bool(user.get("password_hash")),
+        "telegramPromptDismissed": bool(user.get("telegram_prompt_dismissed")),
         "emailVerified": bool(user.get("email_verified")),
         "twoFaEnabled": bool(user.get("totp_enabled")),
         "createdAt": user.get("created_at"),
@@ -187,6 +188,51 @@ def telegram_auth(body: TelegramAuthBody, request: Request):
     repo.touch_login(user["id"])
     token = _issue_token_response(user["id"], request)
     return {"token": token, "user": _public_user(user)}
+
+
+# ---------- Привязка Telegram к уже вошедшему аккаунту (почта/Google/Яндекс) ----------
+# Большинство оплат и уведомлений теперь идут через Telegram (см. чат с
+# владельцем продукта) — после регистрации/входа любым способом фронтенд
+# показывает мини-баннер с предложением привязать Telegram. Пока мини-апп
+# открыт внутри Telegram (это подавляющее большинство сессий — даже вход
+# через email/Google/Яндекс происходит из WebView Telegram), initData уже
+# подписана клиентом Telegram и лежит в window.Telegram.WebApp.initData —
+# значит привязка не требует ни пароля, ни отдельного экрана логина, только
+# то же самое initData, что и обычный "тихий вход" выше (см. /telegram).
+class TelegramLinkBody(BaseModel):
+    initData: str
+
+
+@router.post("/telegram/link")
+def link_telegram(body: TelegramLinkBody, user: dict = Depends(get_current_user)):
+    payload = validate_init_data(body.initData)
+    if not payload or not payload.get("user"):
+        raise HTTPException(status_code=401, detail="Подпись Telegram initData недействительна")
+    tg_user = payload["user"]
+    tg_id = tg_user.get("id")
+    if not tg_id:
+        raise HTTPException(status_code=400, detail="Telegram не передал идентификатор пользователя")
+
+    existing = repo.get_user_by_telegram_id(tg_id)
+    if existing and existing["id"] != user["id"]:
+        raise HTTPException(status_code=409, detail="Этот Telegram уже привязан к другому аккаунту CodeNexa")
+
+    if not existing:
+        user = repo.update_user(
+            user["id"],
+            telegram_id=tg_id,
+            first_name=user.get("first_name") or tg_user.get("first_name"),
+            last_name=user.get("last_name") or tg_user.get("last_name"),
+        )
+    return {"user": _public_user(user)}
+
+
+@router.post("/telegram/dismiss-prompt")
+def dismiss_telegram_prompt(user: dict = Depends(get_current_user)):
+    """Пользователь нажал "Не показывать больше" — баннер больше не всплывает
+    ни на этом, ни на следующих входах, пока Telegram так и не привязан."""
+    user = repo.update_user(user["id"], telegram_prompt_dismissed=True)
+    return {"user": _public_user(user)}
 
 
 # ---------- Текущий пользователь ----------

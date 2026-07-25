@@ -11,6 +11,7 @@ import { getLang, toggleLang, t } from './i18n.js';
 
 import { authApi, getToken, setToken } from './api/authApi.js';
 import { mountAuthCard } from './components/authCard.js';
+import { maybeShowTelegramLinkBanner, removeTelegramLinkBanner } from './components/telegramLinkBanner.js';
 
 import { initTabs } from './components/tabs.js';
 import { mountOnboarding } from './components/onboarding.js';
@@ -146,20 +147,28 @@ async function handleOrgInviteDeepLink() {
 function handleLoggedOut() {
   appShell.hidden = true;
   document.getElementById('view-account').innerHTML = '';
+  removeTelegramLinkBanner();
   mountAuthCard(authRoot, onAuthed);
 }
 
-function onAuthed() {
+// user — необязателен: приходит от authCard (регистрация/вход через
+// email/Google/Яндекс/тихий Telegram-вход) и от повторного входа в
+// ensureAuthenticated() ниже. Ровно в этой точке решаем, показывать ли
+// мини-баннер "привяжите Telegram" — после ЛЮБОГО способа входа и на
+// каждом повторном входе, пока Telegram не привязан или пользователь сам
+// не скрыл баннер (см. components/telegramLinkBanner.js).
+function onAuthed(user) {
   authRoot.innerHTML = '';
   startApp();
+  if (user) maybeShowTelegramLinkBanner(user);
 }
 
 async function ensureAuthenticated() {
   const token = getToken();
   if (token) {
     try {
-      await authApi.me();
-      onAuthed();
+      const { user } = await authApi.me();
+      onAuthed(user);
       return;
     } catch {
       setToken(null); // токен истёк/недействителен — просим войти заново
@@ -171,7 +180,7 @@ async function ensureAuthenticated() {
     try {
       const result = await authApi.loginWithTelegram();
       setToken(result.token);
-      onAuthed();
+      onAuthed(result.user);
       return;
     } catch (e) {
       captureException(e, { stage: 'telegram-silent-login' });

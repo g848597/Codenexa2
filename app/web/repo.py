@@ -357,6 +357,46 @@ def list_payments(user_id: int):
     )
 
 
+def list_pending_manual_payments():
+    """Для админки (см. app/web/api/billing.py::admin_pending_manual_payments):
+    заявки на оплату картой/крипто-переводом вручную, которые ещё не
+    подтверждены — админ сверяет reference (external_id) с реальным
+    поступлением (банковской выпиской/блокчейном) и подтверждает вручную,
+    т.к. в отличие от CryptoBot/Stars здесь нет вебхука, который сделает
+    это сам."""
+    return _fetch_all(
+        "SELECT p.*, u.email, u.telegram_id, u.first_name, u.last_name FROM payments p "
+        "JOIN users u ON u.id = p.user_id "
+        "WHERE p.provider IN ('card', 'crypto_manual') AND p.status = 'pending' "
+        "ORDER BY p.created_at ASC"
+    )
+
+
+def confirm_manual_payment(payment_id: int):
+    """Подтверждает конкретный ручной платёж по id (не по provider+external_id,
+    как mark_payment_paid — там это удобно для вебхука CryptoBot, здесь админ
+    работает по конкретной строке в списке заявок). Возвращает user_id для
+    вызова referrals.maybe_confirm_referral, или None, если платёж не найден,
+    уже обработан, или не является ручным способом (защита от подтверждения
+    "чужого" по типу платежа не из этой админ-страницы)."""
+    with tx() as conn:
+        row = conn.execute(
+            "SELECT plan FROM payments WHERE id = ? AND provider IN ('card', 'crypto_manual') AND status = 'pending'",
+            (payment_id,),
+        ).fetchone()
+        if not row:
+            return None
+        duration_days = _plan_duration_days(row["plan"])
+        expires_sql = "NOW() + (? * INTERVAL '1 day')" if duration_days else "NULL"
+        params = (duration_days,) if duration_days else ()
+        updated = conn.execute(
+            f"UPDATE payments SET status = 'paid', paid_at = NOW(), expires_at = {expires_sql} "
+            "WHERE id = ? RETURNING user_id",
+            (*params, payment_id),
+        ).fetchone()
+        return updated["user_id"] if updated else None
+
+
 # --- oauth state (для Google/Yandex через диплинк в бота, см. README_BACKEND.md) ---
 
 def create_oauth_state(provider: str, state: str):

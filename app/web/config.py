@@ -126,6 +126,28 @@ class Settings:
     # сегмента "/api" каждый запрос ловил 404 (подтверждено проверкой).
     CLEARSPORTS_BASE_URL = _clean_env("CLEARSPORTS_BASE_URL", "https://api.clearsportsapi.com/api/v1")
     SPORT_API_TIMEOUT = float(os.getenv("API_TIMEOUT", "10"))
+
+    # Ручные способы оплаты (страница /billing/checkout, метод "card" и
+    # "crypto_manual" — см. app/web/api/billing.py): в отличие от CryptoBot и
+    # Stars, тут нет API, которое подтвердит оплату само — пользователь видит
+    # реквизиты и переводит вручную, платёж уходит в статус 'pending' и ждёт
+    # ручного подтверждения (по номеру заявки в описании перевода/чеке).
+    #
+    # ВАЖНО: значения ниже — ПЛЕЙСХОЛДЕРЫ. Перед продакшеном задать реальные
+    # реквизиты через переменные окружения (Railway -> Variables), иначе
+    # пользователь увидит "0000 0000 0000 0000" вместо настоящей карты.
+    MANUAL_CARD_NUMBER = _clean_env("MANUAL_CARD_NUMBER", "0000 0000 0000 0000")
+    MANUAL_CARD_HOLDER = _clean_env("MANUAL_CARD_HOLDER", "IVAN IVANOV")
+    MANUAL_CARD_BANK = _clean_env("MANUAL_CARD_BANK", "Т-Банк")
+    # Кошельки под конкретную пару актив+сеть. Ключ — "АКТИВ_СЕТЬ", как в
+    # CRYPTO_MANUAL_NETWORKS (app/web/api/billing.py). Пустая строка = сеть
+    # объявлена на фронте, но адрес ещё не задан — /api/billing/manual-methods
+    # тогда помечает её configured=false, фронт скрывает такую сеть из выбора.
+    MANUAL_WALLET_USDT_TRC20 = _clean_env("MANUAL_WALLET_USDT_TRC20", "")
+    MANUAL_WALLET_USDT_ERC20 = _clean_env("MANUAL_WALLET_USDT_ERC20", "")
+    MANUAL_WALLET_USDT_BEP20 = _clean_env("MANUAL_WALLET_USDT_BEP20", "")
+    MANUAL_WALLET_TON = _clean_env("MANUAL_WALLET_TON", "")
+    MANUAL_WALLET_BTC = _clean_env("MANUAL_WALLET_BTC", "")
     SPORT_API_RETRIES = int(os.getenv("API_RETRIES", "2"))
     SPORT_CACHE_TTL = int(os.getenv("CACHE_TTL", "300"))
     SPORT_REQUEST_DELAY_MS = int(os.getenv("REQUEST_DELAY_MS", "0"))

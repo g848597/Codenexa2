@@ -254,6 +254,9 @@ CREATE TABLE IF NOT EXISTS users (
     -- 'superadmin' — дополнительно может выдавать/отзывать роли другим
     -- пользователям через /api/admin/users.
     role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin', 'superadmin')),
+    -- Баннер "привяжите Telegram" (см. app/web/api/auth.py) — пользователь
+    -- нажал "Не показывать больше", баннер больше не всплывает при входе.
+    telegram_prompt_dismissed BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_login_at TIMESTAMPTZ
 );
@@ -557,6 +560,10 @@ _COLUMN_MIGRATIONS = (
     ("investors", "currency", "TEXT"),
     ("payments", "idempotency_key", "TEXT"),
     ("users", "email_verified", "BOOLEAN NOT NULL DEFAULT FALSE"),
+    # Баннер "привяжите Telegram" (см. app/web/api/auth.py: /telegram/link,
+    # /telegram/dismiss-prompt) — показывается после входа любому пользователю
+    # без telegram_id, пока он явно не нажал "Не показывать больше".
+    ("users", "telegram_prompt_dismissed", "BOOLEAN NOT NULL DEFAULT FALSE"),
     # Реальный срок действия подписки (было: "платил хоть раз" — см. чат,
     # запрос владельца проекта на честную проверку активной подписки, а не
     # факта оплаты когда-либо). duration_days на plans — сколько дней даёт

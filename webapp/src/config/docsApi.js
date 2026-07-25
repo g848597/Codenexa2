@@ -108,5 +108,14 @@ export const docsApi = {
   // --- Тарифы и оплата ---
   getPlans: () => request('/api/billing/plans'),
   getBillingStatus: () => request('/api/billing/status'),
-  checkout: (plan, method, network) => request('/api/billing/checkout', { method: 'POST', body: { plan, method, network } }),
+  // 3-й аргумент — либо строка сети (старый вызов из planCheckoutModal.js —
+  // оставлено для обратной совместимости), либо { network?, asset? } (новый
+  // вызов из components/paymentPage.js). asset нужен только для crypto_manual.
+  checkout: (plan, method, networkOrExtra) => {
+    const extra = (networkOrExtra && typeof networkOrExtra === 'object') ? networkOrExtra : { network: networkOrExtra };
+    return request('/api/billing/checkout', { method: 'POST', body: { plan, method, network: extra.network, asset: extra.asset } });
+  },
+  // Реквизиты для ручных способов оплаты (карта / крипто-кошельки по сетям) —
+  // публичный эндпоинт, без авторизации, см. app/web/api/billing.py::manual_methods.
+  getManualMethods: () => request('/api/billing/manual-methods'),
 };

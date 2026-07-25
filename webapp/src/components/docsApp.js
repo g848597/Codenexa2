@@ -14,7 +14,7 @@ import { captureReturnTarget, getReturnTarget, reopenProductIfNeeded } from '../
 import { esc } from '../utils/html.js';
 import { icon } from '../utils/icons.js';
 import { backButtonHTML as _backButtonHTML, errorHTML as _errorHTML, loadingHTML as _loadingHTML } from '../utils/loadingState.js';
-import { showPlanCheckout } from './planCheckoutModal.js';
+import { openPaymentPage } from './paymentPage.js';
 
 let root = null;
 let screenStack = [{ name: 'home' }];
@@ -1078,19 +1078,22 @@ async function loadTariffs() {
   }
 }
 
-// Тариф и оплата — мини-окно поверх текущего экрана (см.
-// components/planCheckoutModal.js), а не разворачивающийся блок на той же
-// странице, как было раньше. Оплата идёт через тот же docsApi.checkout(),
-// который уже работал — здесь только новый UI вокруг него.
+// Тариф и оплата — отдельная полноэкранная страница (см.
+// components/paymentPage.js), а не разворачивающийся блок на той же
+// странице, как было раньше, и не мини-окно planCheckoutModal.js (оно всё
+// ещё есть в проекте, просто здесь больше не используется). Оплата идёт
+// через тот же docsApi.checkout(), который уже работал — здесь только
+// новый UI вокруг него.
 function wireTariffs() {
   root.querySelectorAll('[data-buy]').forEach((btn) => {
     btn.addEventListener('click', () => {
       haptic('light');
-      showPlanCheckout({
+      openPaymentPage({
         plans: tariffsState.plans,
         planCode: btn.dataset.buy,
         lockPlan: true,
-        checkout: (code, method, network) => docsApi.checkout(code, method, network),
+        checkout: (code, method, extra) => docsApi.checkout(code, method, extra),
+        getManualMethods: () => docsApi.getManualMethods(),
         onSuccess: () => loadTariffs(),
       });
     });

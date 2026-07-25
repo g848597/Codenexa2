@@ -80,6 +80,13 @@ export const authApi = {
       body: { initData: getInitDataRaw() },
     }),
 
+  // Привязка Telegram к уже вошедшему аккаунту (почта/Google/Яндекс) — см.
+  // components/telegramLinkBanner.js. Авторизация тут обычная (Bearer —
+  // useTelegram НЕ true), initData едет только в теле как доказательство
+  // личности в Telegram, а не как способ входа.
+  linkTelegram: (initData) => request('/api/auth/telegram/link', { method: 'POST', body: { initData } }),
+  dismissTelegramPrompt: () => request('/api/auth/telegram/dismiss-prompt', { method: 'POST' }),
+
   register: (email, password, firstName) =>
     request('/api/auth/register', { method: 'POST', body: { email, password, firstName } }),
   login: (email, password, totpCode) =>
@@ -126,12 +133,19 @@ export const authApi = {
   // idempotencyKey: см. components/accountApp.js — один и тот же ключ на всю
   // попытку оплаты (переживает ретраи после ошибки), чтобы повторная отправка
   // не создавала второй инвойс на бэкенде (см. аудит, п.0.5).
-  checkout: (plan, method, network, idempotencyKey) =>
-    request('/api/billing/checkout', {
+  // 3-й аргумент — либо строка сети (старый вызов, оставлено для обратной
+  // совместимости), либо { network?, asset? } (новый вызов из
+  // components/paymentPage.js) — см. тот же комментарий в config/docsApi.js.
+  checkout: (plan, method, networkOrExtra, idempotencyKey) => {
+    const extra = (networkOrExtra && typeof networkOrExtra === 'object') ? networkOrExtra : { network: networkOrExtra };
+    return request('/api/billing/checkout', {
       method: 'POST',
-      body: { plan, method, network },
+      body: { plan, method, network: extra.network, asset: extra.asset },
       extraHeaders: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {},
-    }),
+    });
+  },
+  // Реквизиты для ручных способов оплаты (карта / крипто-кошельки по сетям).
+  getManualMethods: () => request('/api/billing/manual-methods'),
 
   // --- Организация (общий аккаунт компании, см. profile/organizationSection.js) ---
   myOrganization: () => request('/api/organizations/me'),

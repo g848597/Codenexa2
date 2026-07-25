@@ -638,3 +638,59 @@ body.pcm-lock { overflow: hidden; }
 }
 .pcm-result-icon svg { width: 24px; height: 24px; }
 .pcm-result .pcm-pay-btn { margin-top: 16px; }
+
+/* ============================================================================
+   Telegram Link Banner (tgb-*) — мини-баннер "привяжите Telegram", см.
+   components/telegramLinkBanner.js. Не модальное окно и не блокирует
+   интерфейс (в отличие от .pcm-backdrop выше) — прилипает к низу экрана,
+   пользователь может продолжать пользоваться приложением и закрыть баннер
+   когда удобно.
+   ========================================================================= */
+
+.tgb-wrap {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 85;
+  display: flex; justify-content: center; padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+  animation: tgb-slide-up .32s var(--ease-out);
+}
+@keyframes tgb-slide-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.tgb-card {
+  pointer-events: auto; width: 100%; max-width: 460px;
+  padding: 16px 18px; border-radius: var(--radius-lg);
+  background: radial-gradient(ellipse 320px 160px at 15% -20%, var(--steel-dim), transparent 60%), var(--bg-card);
+  border: var(--border-glass);
+  box-shadow: 0 -8px 40px -12px rgba(0,0,0,0.6), 0 0 0 1px var(--line);
+  backdrop-filter: blur(20px);
+}
+
+.tgb-row { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.tgb-icon {
+  flex: none; width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  background: var(--steel-dim); color: var(--steel);
+}
+.tgb-text { font-size: 13px; line-height: 1.5; color: var(--text-dim); padding-top: 4px; }
+
+.tgb-actions { display: flex; flex-direction: column; gap: 8px; }
+.tgb-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  padding: 12px; border-radius: var(--radius-sm); font-weight: 700; font-size: 13.5px; cursor: pointer;
+  transition: filter .2s var(--ease), background .2s var(--ease), color .2s var(--ease);
+}
+.tgb-btn svg { width: 16px; height: 16px; }
+.tgb-btn:disabled { opacity: .6; cursor: default; }
+.tgb-btn-primary { border: none; background: var(--gradient-steel); color: var(--on-steel); box-shadow: var(--glow-steel); }
+.tgb-btn-primary:hover:not(:disabled) { filter: brightness(1.06); }
+.tgb-btn-ghost { border: none; background: none; color: var(--text-faint); font-weight: 600; padding: 4px; }
+.tgb-btn-ghost:hover { color: var(--text-dim); }
+
+.tgb-error { font-size: 11.5px; color: var(--danger-text); background: var(--danger-dim); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 10px; }
+
+@media (min-width: 420px) {
+  .tgb-actions { flex-direction: row-reverse; }
+  .tgb-btn-ghost { width: auto; flex: none; }
+  .tgb-btn-primary { flex: 1; }
+}

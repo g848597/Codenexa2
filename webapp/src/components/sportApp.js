@@ -11,7 +11,7 @@ import { captureReturnTarget, getReturnTarget, reopenProductIfNeeded } from '../
 import { esc } from '../utils/html.js';
 import { icon } from '../utils/icons.js';
 import { backButtonHTML as _backButtonHTML, errorHTML as _errorHTML, loadingHTML as _loadingHTML } from '../utils/loadingState.js';
-import { showPlanCheckout } from './planCheckoutModal.js';
+import { openPaymentPage } from './paymentPage.js';
 
 let root = null;
 let screenStack = [{ name: 'home' }];
@@ -426,8 +426,8 @@ function wireCommon() {
     });
   });
 
-  // Тарифы и оплата — мини-окно поверх текущего экрана (см.
-  // components/planCheckoutModal.js), а не переход на вкладку "Аккаунт".
+  // Тарифы и оплата — отдельная полноэкранная страница (см.
+  // components/paymentPage.js), а не переход на вкладку "Аккаунт".
   // В wireCommon(), а не только в wireHome(), т.к. кнопка "PRO" в шапке и
   // залоченные чипы прогнозов встречаются и на экранах команды/live-табло.
   // Оплата идёт через тот же authApi.checkout(), которым пользуется личный
@@ -775,10 +775,11 @@ function openSportPlanCheckout(planCode) {
     document.querySelector('.tab[data-view="account"]')?.click();
     return;
   }
-  showPlanCheckout({
+  openPaymentPage({
     plans,
     planCode: planCode || undefined,
-    checkout: (code, method, network) => authApi.checkout(code, method, network, crypto.randomUUID()),
+    checkout: (code, method, extra) => authApi.checkout(code, method, extra, crypto.randomUUID()),
+    getManualMethods: () => authApi.getManualMethods(),
     onSuccess: () => { sportApi.tier().then((tierData) => { if (tierData) { tierState = { loaded: true, tier: tierData.tier, tierTitle: tierData.tierTitle, daysUnlocked: tierData.daysUnlocked, predMin: tierData.predMin, predMax: tierData.predMax }; render(); } }).catch(() => {}); },
   });
 }
