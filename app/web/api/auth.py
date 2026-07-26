@@ -164,6 +164,18 @@ def login(body: LoginBody, request: Request):
 
 # ---------- Telegram (тихий вход внутри мини-аппа) ----------
 
+@router.get("/telegram/bot-info")
+def telegram_bot_info():
+    """Публичный эндпоинт: отдаёт актуальный username бота из переменных
+    окружения сервера (см. config.py: TELEGRAM_BOT_USERNAME). Раньше
+    webapp/src/components/telegramLinkBanner.js хранил username бота
+    ЗАХАРДКОЖЕННЫМ в JS-константе — при смене бота (например, на тестовый)
+    ссылка "Привязать Telegram" вела на старого бота, который либо не
+    отвечает, либо вообще не тот аккаунт. Теперь фронтенд спрашивает это
+    у сервера, а не хранит своё мнение."""
+    return {"username": settings.TELEGRAM_BOT_USERNAME}
+
+
 class TelegramAuthBody(BaseModel):
     initData: str
 

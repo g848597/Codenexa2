@@ -13,8 +13,8 @@
 //    подделать её нельзя — просто открываем бота, а не тычем в воздух.
 import { authApi } from '../api/authApi.js';
 import { getInitDataRaw, isInsideTelegram, haptic, openTelegramLink } from '../telegram.js';
+import { botLink } from '../utils/botLink.js';
 
-const BOT_LINK = 'https://t.me/codenexa_bot';
 const BANNER_ID = 'tg-link-banner';
 
 function icon() {
@@ -62,7 +62,12 @@ function renderBanner() {
     if (!isInsideTelegram()) {
       // Нет подписанной initData вне Telegram — честно ведём в бота, а не
       // притворяемся, что привязали без проверки личности.
-      openTelegramLink(BOT_LINK);
+      const link = botLink();
+      if (!link) {
+        haptic('light');
+        return; // сервер не знает username бота (не настроен TELEGRAM_BOT_USERNAME) — вести некуда
+      }
+      openTelegramLink(link);
       return;
     }
     linkBtn.disabled = true;

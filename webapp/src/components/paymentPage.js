@@ -23,10 +23,7 @@ import { esc } from '../utils/html.js';
 import { icon } from '../utils/icons.js';
 import { haptic, isInsideTelegram, openInvoice, showAlert } from '../telegram.js';
 import { t } from '../i18n.js';
-
-// TODO(владелец): замените на реальный контакт поддержки — тот же плейсхолдер,
-// что и в profile/supportSection.js.
-const SUPPORT_TELEGRAM = 'https://t.me/codenexa_bot';
+import { botLink } from '../utils/botLink.js';
 
 let rootEl = null;
 let opts = null;
@@ -305,7 +302,9 @@ function resultStepHTML() {
 }
 
 function supportLinkHTML() {
-  return `<a class="pp-support-link" href="${esc(SUPPORT_TELEGRAM)}" target="_blank" rel="noopener">${icon('externalLink')} ${t('pp_support_btn')}</a>`;
+  const link = botLink();
+  if (!link) return '';
+  return `<a class="pp-support-link" href="${esc(link)}" target="_blank" rel="noopener">${icon('externalLink')} ${t('pp_support_btn')}</a>`;
 }
 
 function stepHTML() {

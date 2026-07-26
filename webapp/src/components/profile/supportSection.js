@@ -2,15 +2,17 @@
 // же источник, что и вкладка "Доверие". Discord нигде в проекте не заведён
 // (ни ссылки, ни упоминания реального сервера) — мы не добавляем кнопку в
 // никуда; вместо этого честный набор: FAQ/правовая база (уже существующий
-// экран legal.js), Telegram-бот (реальный @codenexa_bot, как и в реферальной
+// экран legal.js), Telegram-бот (см. utils/botLink.js — username берётся с сервера, как и в реферальной
 // ссылке partners.js), и почта для багрепортов — по образцу
 // config/partners.js (PARTNER_APPLICATION_ENDPOINT), с тем же TODO для владельца.
 import { icon } from '../../utils/icons.js';
 import { t } from '../../i18n.js';
+import { getBotUsername, botLink } from '../../utils/botLink.js';
 
 const BUG_REPORT_EMAIL = 'support@codenexa.example'; // TODO(владелец): замените на реальный email
 
 export function supportSectionHTML() {
+  const botUsername = getBotUsername();
   return `
   <div class="hub-row-list">
     <button class="hub-row" data-hub-open-legal type="button">
@@ -18,11 +20,11 @@ export function supportSectionHTML() {
       <span class="hub-row-main"><span class="hub-row-title">${t('hub_support_faq')}</span></span>
       <span class="hub-row-chevron">${icon('chevronLeft')}</span>
     </button>
-    <button class="hub-row" data-hub-open-tg type="button">
+    <button class="hub-row" data-hub-open-tg type="button" ${botUsername ? '' : 'disabled'}>
       <span class="hub-row-icon">${icon('bot')}</span>
       <span class="hub-row-main">
         <span class="hub-row-title">${t('hub_support_telegram')}</span>
-        <span class="hub-row-sub">@codenexa_bot</span>
+        <span class="hub-row-sub">${botUsername ? '@' + botUsername : t('pt_bot_not_configured')}</span>
       </span>
       <span class="hub-row-chevron">${icon('chevronLeft')}</span>
     </button>
@@ -42,5 +44,8 @@ export function bindSupportSection(root, { onOpenLegal }) {
   if (legalBtn && onOpenLegal) legalBtn.addEventListener('click', onOpenLegal);
 
   const tgBtn = root.querySelector('[data-hub-open-tg]');
-  if (tgBtn) tgBtn.addEventListener('click', () => window.open('https://t.me/codenexa_bot', '_blank'));
+  if (tgBtn) tgBtn.addEventListener('click', () => {
+    const link = botLink();
+    if (link) window.open(link, '_blank');
+  });
 }

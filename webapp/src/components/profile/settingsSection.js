@@ -6,6 +6,7 @@
 // которые ничего не переключают на сервере, честно объясняем, где реально
 // управляются уведомления (в чате с Telegram-ботом).
 import { getLang, t } from '../../i18n.js';
+import { botLink } from '../../utils/botLink.js';
 import { icon } from '../../utils/icons.js';
 
 export function settingsSectionHTML() {
@@ -45,5 +46,8 @@ export function bindSettingsSection(root, { onLangToggle }) {
   if (langBtn) langBtn.addEventListener('click', onLangToggle);
 
   const botBtn = root.querySelector('[data-hub-open-bot]');
-  if (botBtn) botBtn.addEventListener('click', () => window.open('https://t.me/codenexa_bot', '_blank'));
+  if (botBtn) botBtn.addEventListener('click', () => {
+    const link = botLink();
+    if (link) window.open(link, '_blank');
+  });
 }

@@ -2,10 +2,11 @@
 // (GET /api/referrals/me, см. app/web/api/referrals.py): confirmedCount
 // засчитывается только после первой успешной оплаты приглашённого, так что
 // это число нельзя накрутить регистрациями без оплаты. Ссылка строится по
-// той же схеме, что и в components/partners.js (t.me/codenexa_bot?start=ref_<id>).
+// той же схеме, что и в components/partners.js (см. utils/botLink.js).
 import { haptic, getTelegramUser } from '../../telegram.js';
 import { t } from '../../i18n.js';
 import { esc } from '../../utils/html.js';
+import { botLink } from '../../utils/botLink.js';
 
 export function referralSectionHTML(referralStats) {
   const tgUser = getTelegramUser();
@@ -20,13 +21,13 @@ export function referralSectionHTML(referralStats) {
     </div>`;
   }
 
-  const link = `https://t.me/codenexa_bot?start=ref_${esc(code)}`;
+  const link = botLink(`?start=ref_${esc(code)}`);
 
   return `
   <div class="hub-ref-card">
     <div class="hub-ref-link-row">
-      <input type="text" class="hub-ref-link-input" value="${link}" readonly />
-      <button class="hub-ref-copy-btn" data-hub-ref-copy type="button">${t('pt_copy_btn')}</button>
+      <input type="text" class="hub-ref-link-input" value="${link || t('pt_bot_not_configured')}" readonly />
+      <button class="hub-ref-copy-btn" data-hub-ref-copy type="button" ${link ? '' : 'disabled'}>${t('pt_copy_btn')}</button>
     </div>
     <div class="hub-ref-stats">
       <div class="hub-ref-stat"><span class="num">${confirmed}</span><span class="label">${t('hub_ref_confirmed')}</span></div>

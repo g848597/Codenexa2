@@ -12,6 +12,7 @@ import { getLang, toggleLang, t } from './i18n.js';
 import { authApi, getToken, setToken } from './api/authApi.js';
 import { mountAuthCard } from './components/authCard.js';
 import { maybeShowTelegramLinkBanner, removeTelegramLinkBanner } from './components/telegramLinkBanner.js';
+import { loadBotUsername } from './utils/botLink.js';
 
 import { initTabs } from './components/tabs.js';
 import { mountOnboarding } from './components/onboarding.js';
@@ -157,8 +158,9 @@ function handleLoggedOut() {
 // мини-баннер "привяжите Telegram" — после ЛЮБОГО способа входа и на
 // каждом повторном входе, пока Telegram не привязан или пользователь сам
 // не скрыл баннер (см. components/telegramLinkBanner.js).
-function onAuthed(user) {
+async function onAuthed(user) {
   authRoot.innerHTML = '';
+  await loadBotUsername(); // до рендера — иначе ссылки на бота (реф. код, поддержка и т.д.) откроются на "null"/старом боте
   startApp();
   if (user) maybeShowTelegramLinkBanner(user);
 }

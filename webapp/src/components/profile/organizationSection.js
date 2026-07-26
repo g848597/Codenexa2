@@ -13,6 +13,7 @@ import { t } from '../../i18n.js';
 import { esc } from '../../utils/html.js';
 import { authApi } from '../../api/authApi.js';
 import { haptic, showAlert } from '../../telegram.js';
+import { botLink } from '../../utils/botLink.js';
 
 const BUSINESS_PLAN_CODES = new Set(['business_yearly']);
 
@@ -142,7 +143,12 @@ export function bindOrganizationSection(root, ctx) {
       ui.busy.invite = true; ui.notice = null; render();
       try {
         const res = await authApi.inviteOrgMember();
-        ui.inviteLink = `https://t.me/codenexa_bot?startapp=org_invite_${encodeURIComponent(res.token)}`;
+        const link = botLink(`?startapp=org_invite_${encodeURIComponent(res.token)}`);
+        if (!link) {
+          ui.notice = { ok: false, text: t('pt_bot_not_configured') };
+        } else {
+          ui.inviteLink = link;
+        }
       } catch (err) {
         ui.notice = { ok: false, text: err.message || 'Не удалось создать приглашение' };
       }

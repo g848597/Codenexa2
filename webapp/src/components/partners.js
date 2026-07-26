@@ -4,6 +4,7 @@ import { getTelegramUser } from '../telegram.js';
 import { haptic } from '../telegram.js';
 import { t, tl } from '../i18n.js';
 import { esc } from '../utils/html.js';
+import { botLink } from '../utils/botLink.js';
 
 // Единственное место в этом файле, куда попадает свободный текст, введённый
 // вручную владельцем в PARTNERS_SHOWCASE (название партнёра) — экранируем на
@@ -20,15 +21,15 @@ function termsLabel(rewardValue, rewardUnit, description) {
 function referralBlock() {
   const tgUser = getTelegramUser();
   const code = getReferralCode(tgUser && tgUser.id ? tgUser.id : null);
-  const link = `https://t.me/codenexa_bot?start=ref_${code}`;
+  const link = botLink(`?start=ref_${code}`);
   const invited = getInvitedCount();
 
   return `
   <div class="pd-block">
     <h3>${t('pt_referral_title')}</h3>
     <div class="ref-link-row">
-      <input type="text" class="ref-link-input" value="${link}" readonly>
-      <button class="ref-copy-btn" data-copy-link>${t('pt_copy_btn')}</button>
+      <input type="text" class="ref-link-input" value="${link || t('pt_bot_not_configured')}" readonly>
+      <button class="ref-copy-btn" data-copy-link ${link ? '' : 'disabled'}>${t('pt_copy_btn')}</button>
     </div>
     <div class="ref-stats-row">
       <div class="ref-stat">

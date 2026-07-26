@@ -85,6 +85,11 @@ export const authApi = {
   // useTelegram НЕ true), initData едет только в теле как доказательство
   // личности в Telegram, а не как способ входа.
   linkTelegram: (initData) => request('/api/auth/telegram/link', { method: 'POST', body: { initData } }),
+  // Публичный, без авторизации — см. app/web/api/auth.py::telegram_bot_info.
+  // Источник правды для username бота: НЕ хардкодить его во фронтенде,
+  // иначе при смене бота (например, на тестовый) старые ссылки продолжат
+  // вести на прежнего бота.
+  getBotInfo: () => request('/api/auth/telegram/bot-info'),
   dismissTelegramPrompt: () => request('/api/auth/telegram/dismiss-prompt', { method: 'POST' }),
 
   register: (email, password, firstName) =>
