@@ -1,10 +1,12 @@
 """Автоматическая настройка вебхука Telegram-бота при старте сервера.
 
 Раньше вебхук приходилось привязывать вручную — открыть в браузере ссылку
-вида https://api.telegram.org/bot<TOKEN>/setWebhook?url=...&secret_token=...
+вида https://api.telegram.org/bot<TOKEN>/setWebhook?url=<PUBLIC_BASE_URL>/api/telegram/webhook/<WEBHOOK_SECRET>
 после каждой смены бота (TELEGRAM_BOT_TOKEN в Railway). Легко забыть или
-перепутать URL — ровно так и было (см. историю: бот открывался, но
-/telegram/webhook не был привязан, вебхук молчал).
+перепутать URL — ровно так и было (см. историю: первая версия автонастройки
+сама ошиблась в пути — указала /telegram/webhook вместо реального
+/api/telegram/webhook/<секрет>, см. app/web/api/telegram_webhook.py — секрет
+там часть ПУТИ, а не заголовка X-Telegram-Bot-Api-Secret-Token).
 
 Теперь это делает сам сервер при каждом запуске: сравнивает, что сейчас
 привязано (getWebhookInfo), с тем, что должно быть (settings.PUBLIC_BASE_URL
@@ -38,7 +40,7 @@ async def setup_webhook():
         )
         return
 
-    target_url = f"{settings.PUBLIC_BASE_URL}/telegram/webhook"
+    target_url = f"{settings.PUBLIC_BASE_URL}/api/telegram/webhook/{settings.TELEGRAM_WEBHOOK_SECRET}"
     api_base = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}"
 
     try:
@@ -55,7 +57,6 @@ async def setup_webhook():
                 f"{api_base}/setWebhook",
                 params={
                     "url": target_url,
-                    "secret_token": settings.TELEGRAM_WEBHOOK_SECRET,
                     "allowed_updates": '["message","pre_checkout_query"]',
                 },
             )
