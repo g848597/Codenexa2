@@ -47,6 +47,7 @@ app/web/            — бэкенд (FastAPI)
   deps.py             — FastAPI Depends: get_current_user(_optional), get_current_admin, is_admin_user
   docgen.py           — генерация PDF (reportlab) и DOCX (python-docx) из документов
   reminder_worker.py  — фоновый asyncio-воркер: напоминания о матчах AI Sport через Telegram-бота
+  telegram_setup.py   — при каждом старте сервера сам привязывает вебхук бота (setWebhook), вручную больше не нужно
   referrals.py        — логика реферальной программы (подтверждение по первой оплате)
   fonts/              — DejaVuSans.ttf/-Bold.ttf — Cyrillic-шрифт для PDF (Helvetica кириллицу не умеет!)
 
@@ -271,3 +272,9 @@ AI Sport: `FOOTBALLDATA_API_KEY/BASE_URL`, `CLEARSPORTS_API_KEY/BASE_URL`, `CACH
 кавычек/невидимых символов (`_clean_env()` в `config.py`) — это защита от
 ручного редактирования переменных с телефона, где клавиатура подменяет
 обычные кавычки на типографские.
+
+**Вебхук бота настраивается сам** (`app/web/telegram_setup.py`, вызывается
+при каждом старте сервера) — не нужно вручную открывать ссылку setWebhook
+при смене бота, сервер сам сверяет и перепривязывает. `PUBLIC_BASE_URL`
+для этого тоже не нужно задавать вручную на Railway — используется
+автоматическая переменная `RAILWAY_PUBLIC_DOMAIN`.

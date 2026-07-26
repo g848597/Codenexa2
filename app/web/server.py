@@ -15,7 +15,7 @@ import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.web import reminder_worker
+from app.web import reminder_worker, telegram_setup
 from app.web.api import admin_plans, admin_users, auth, billing, docs, investors, organizations, referrals, sport_routes, telegram_webhook
 from app.web.config import settings
 from app.web.db import get_conn, init_db
@@ -62,6 +62,17 @@ app.include_router(telegram_webhook.router)
 app.include_router(sport_routes.router)
 app.include_router(organizations.router)
 app.include_router(docs.router)
+
+
+@app.on_event("startup")
+async def _setup_telegram_webhook():
+    # Раньше вебхук привязывался вручную по ссылке в браузере (setWebhook)
+    # после каждой смены бота — легко забыть, отсюда баг "бот открывается, но
+    # молчит". Теперь сервер сам сверяет и перепривязывает при каждом
+    # старте — см. app/web/telegram_setup.py. Не блокирует запуск сервера,
+    # если Telegram недоступен или токен неверный (только предупреждение в
+    # логах Railway).
+    await telegram_setup.setup_webhook()
 
 
 @app.on_event("startup")

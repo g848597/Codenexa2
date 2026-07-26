@@ -168,7 +168,15 @@ class Settings:
     # Без переменной поведение как раньше — состояние живёт в памяти одного процесса.
     REDIS_URL = os.getenv("REDIS_URL", "")
 
-    PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
+    # Railway сам прописывает RAILWAY_PUBLIC_DOMAIN (без протокола, только
+    # домен) на каждый деплой — если PUBLIC_BASE_URL не задан вручную,
+    # используем его. Раньше без ручной настройки PUBLIC_BASE_URL тут был
+    # localhost:8000, из-за чего автонастройка вебхука бота (см.
+    # server.py::_setup_telegram_webhook) пыталась прописать боту
+    # несуществующий адрес.
+    _railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
+    _default_base_url = f"https://{_railway_domain}" if _railway_domain else "http://localhost:8000"
+    PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", _default_base_url).rstrip("/")
     # Postgres (Supabase). Пример:
     # postgresql://postgres:PASSWORD@db.xxxxx.supabase.co:5432/postgres
     DATABASE_URL = os.getenv("DATABASE_URL", "")
