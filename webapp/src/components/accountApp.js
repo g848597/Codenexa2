@@ -43,7 +43,6 @@ let screenStack = [{ name: 'home' }];
 
 // checkout-ключ ("checkout:<plan>:<method>") -> Idempotency-Key одной попытки
 // оплаты. См. обработчик [data-acc-buy] ниже и аудит, п.0.5.
-const checkoutIdempotencyKeys = new Map();
 
 function freshState() {
   return {
@@ -276,8 +275,7 @@ function bind(screen) {
       bindAiInsights(root, (productId) => openProductView(productId));
       break;
     case 'subscription':
-      bindSubscriptionCard(root, 'hub-payments');
-      wireCheckout();
+      bindSubscriptionCard(root, 'hub-payments', state.plans, () => loadAll());
       break;
     case 'organization':
       bindOrganizationSection(root, { state, render, reloadOrg, showViewPlans: () => push('subscription') });
@@ -312,40 +310,6 @@ function bind(screen) {
 // Платежи: переиспользуем ровно ту же логику чекаута/idempotency, что была
 // в исходном accountApp.js — блок paymentsSection.js рендерит те же
 // data-acc-buy кнопки, теперь на экране "Тариф и платежи".
-function wireCheckout() {
-  root.querySelectorAll('[data-acc-buy]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const plan = btn.dataset.accBuy;
-      const method = btn.dataset.method;
-      const key = `checkout:${plan}:${method}`;
-      state.busy[key] = true;
-      render();
-      if (!checkoutIdempotencyKeys.has(key)) {
-        checkoutIdempotencyKeys.set(key, crypto.randomUUID());
-      }
-      const idempotencyKey = checkoutIdempotencyKeys.get(key);
-      try {
-        const result = await authApi.checkout(plan, method, 'USDT', idempotencyKey);
-        checkoutIdempotencyKeys.delete(key);
-        if (result.method === 'stars') {
-          openInvoice(result.invoiceLink, (status) => {
-            if (status === 'paid') {
-              showAlert('Оплата прошла успешно!');
-              loadAll();
-            }
-          });
-        } else if (result.payUrl) {
-          window.open(result.payUrl, '_blank');
-        }
-      } catch (e) {
-        showAlert(e.message || 'Не удалось создать счёт');
-      }
-      state.busy[key] = false;
-      render();
-    });
-  });
-}
-
 export function openAccountApp(logoutCallback, opts = {}) {
   onLoggedOut = logoutCallback;
   captureReturnTarget();
