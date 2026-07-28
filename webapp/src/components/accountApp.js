@@ -34,6 +34,8 @@ import { supportSectionHTML, bindSupportSection } from './profile/supportSection
 import { organizationSectionHTML, bindOrganizationSection } from './profile/organizationSection.js';
 import { ecosystemBannerHTML } from './profile/ecosystemBanner.js';
 import { openProductView } from './productDetail.js';
+import { openPaymentPage } from './paymentPage.js';
+import { openAdminApp } from './adminApp.js';
 
 let root = null;
 let user = null;
@@ -43,6 +45,7 @@ let screenStack = [{ name: 'home' }];
 
 // checkout-ключ ("checkout:<plan>:<method>") -> Idempotency-Key одной попытки
 // оплаты. См. обработчик [data-acc-buy] ниже и аудит, п.0.5.
+const checkoutIdempotencyKeys = new Map();
 
 function freshState() {
   return {
@@ -139,6 +142,10 @@ function orgValueLabel() {
 
 // name — id экрана, icon/titleKey/subKey — как в меню, value() — короткая
 // подпись справа (текущий тариф, название компании и т.д.), опционально.
+// 'admin' — единственный пункт с visible(): проверка роли на фронтенде
+// только для UX (спрятать пункт меню от обычных пользователей), реальная
+// граница доступа — бэкенд (get_current_admin/get_current_superadmin в
+// app/web/deps.py), см. admin_panel_build_prompt.md, п.2.
 const MENU_ITEMS = [
   { name: 'ecosystem', icon: 'layers', titleKey: 'hub_section_ecosystem', subKey: 'hub_menu_ecosystem_sub' },
   { name: 'subscription', icon: 'crown', titleKey: 'hub_section_subscription', subKey: 'hub_menu_subscription_sub', value: planValueLabel },
@@ -148,7 +155,12 @@ const MENU_ITEMS = [
   { name: 'security', icon: 'shieldCheck', titleKey: 'hub_section_security', subKey: 'hub_menu_security_sub' },
   { name: 'settings', icon: 'tool', titleKey: 'hub_section_settings', subKey: 'hub_menu_settings_sub' },
   { name: 'support', icon: 'bot', titleKey: 'hub_section_support', subKey: 'hub_menu_support_sub' },
+  { name: 'admin', icon: 'gauge', titleKey: 'hub_section_admin', subKey: 'hub_menu_admin_sub', visible: () => !!(user && (user.role === 'admin' || user.role === 'superadmin')) },
 ];
+
+function visibleMenuItems() {
+  return MENU_ITEMS.filter((item) => !item.visible || item.visible());
+}
 
 function menuRowHTML(item) {
   const value = item.value ? item.value() : '';
@@ -171,7 +183,7 @@ function renderHome() {
 
     <div class="hub-menu-hint">${t('hub_menu_hint')}</div>
     <div class="hub-row-list">
-      ${MENU_ITEMS.map(menuRowHTML).join('')}
+      ${visibleMenuItems().map(menuRowHTML).join('')}
     </div>
 
     <div class="hub-section" style="margin-top:26px;">
@@ -250,7 +262,24 @@ function bind(screen) {
 
   if (screen.name === 'home') {
     root.querySelectorAll('[data-menu-go]').forEach((btn) => {
-      btn.addEventListener('click', () => { haptic('light'); push(btn.dataset.menuGo); });
+      btn.addEventListener('click', () => {
+        haptic('light');
+        const name = btn.dataset.menuGo;
+        // Admin-панель — не экран внутри HUB'а, а отдельное полноэкранное
+        // приложение (свой screenStack, см. adminApp.js) — открывается
+        // поверх view-account, а не через push()/renderScreen() ниже.
+        if (name === 'admin') {
+          openAdminApp({
+            isSuperadmin: !!(user && user.isSuperadmin),
+            onClose: () => {
+              document.getElementById('view-account').classList.add('active');
+              render();
+            },
+          });
+          return;
+        }
+        push(name);
+      });
     });
 
     const editBtn = root.querySelector('[data-hub-edit-profile]');
@@ -274,9 +303,16 @@ function bind(screen) {
       bindEcosystemGrid(root, render);
       bindAiInsights(root, (productId) => openProductView(productId));
       break;
-    case 'subscription':
-      bindSubscriptionCard(root, 'hub-payments', state.plans, () => loadAll());
+    case 'subscription': {
+      const isActive = !!(state.billing && state.billing.subscription && state.billing.subscription.active);
+      bindSubscriptionCard(root, {
+        scrollTargetId: 'hub-payments',
+        isActive,
+        onViewPlans: () => openAccountPlanCheckout(),
+      });
+      wireCheckout();
       break;
+    }
     case 'organization':
       bindOrganizationSection(root, { state, render, reloadOrg, showViewPlans: () => push('subscription') });
       break;
@@ -310,6 +346,59 @@ function bind(screen) {
 // Платежи: переиспользуем ровно ту же логику чекаута/idempotency, что была
 // в исходном accountApp.js — блок paymentsSection.js рендерит те же
 // data-acc-buy кнопки, теперь на экране "Тариф и платежи".
+function wireCheckout() {
+  root.querySelectorAll('[data-acc-buy]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const plan = btn.dataset.accBuy;
+      const method = btn.dataset.method;
+      const key = `checkout:${plan}:${method}`;
+      state.busy[key] = true;
+      render();
+      if (!checkoutIdempotencyKeys.has(key)) {
+        checkoutIdempotencyKeys.set(key, crypto.randomUUID());
+      }
+      const idempotencyKey = checkoutIdempotencyKeys.get(key);
+      try {
+        const result = await authApi.checkout(plan, method, 'USDT', idempotencyKey);
+        checkoutIdempotencyKeys.delete(key);
+        if (result.method === 'stars') {
+          openInvoice(result.invoiceLink, (status) => {
+            if (status === 'paid') {
+              showAlert('Оплата прошла успешно!');
+              loadAll();
+            }
+          });
+        } else if (result.payUrl) {
+          window.open(result.payUrl, '_blank');
+        }
+      } catch (e) {
+        showAlert(e.message || 'Не удалось создать счёт');
+      }
+      state.busy[key] = false;
+      render();
+    });
+  });
+}
+
+// Единая точка входа на "спец-страницу" оплаты для раздела Личный кабинет —
+// тот же самый openPaymentPage(), что используют AI Sport и AI Docs, чтобы
+// клик по тарифу вёл на одну и ту же страницу везде в приложении, а не на
+// разные механизмы оплаты в разных разделах.
+function openAccountPlanCheckout(planCode) {
+  const plans = (state.plans && state.plans.plans) || [];
+  if (!plans.length) {
+    showAlert('Тарифы сейчас недоступны, попробуйте чуть позже');
+    return;
+  }
+  openPaymentPage({
+    plans,
+    planCode: planCode || undefined,
+    checkout: (code, method, extra) => authApi.checkout(code, method, extra, crypto.randomUUID()),
+    getManualMethods: () => authApi.getManualMethods(),
+    onSuccess: () => { loadAll(); },
+  });
+}
+
 export function openAccountApp(logoutCallback, opts = {}) {
   onLoggedOut = logoutCallback;
   captureReturnTarget();

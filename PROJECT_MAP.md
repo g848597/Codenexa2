@@ -44,7 +44,8 @@ app/web/            — бэкенд (FastAPI)
   audit.py            — запись в admin_audit_log для всех admin-действий
   cache.py            — опциональный Redis (rate-limit), без REDIS_URL падает на in-memory
   middleware.py        — security-заголовки на каждый ответ
-  deps.py             — FastAPI Depends: get_current_user(_optional), get_current_admin, is_admin_user
+  deps.py             — FastAPI Depends: get_current_user(_optional), get_current_admin,
+                        get_current_superadmin, is_admin_user, is_superadmin_user
   docgen.py           — генерация PDF (reportlab) и DOCX (python-docx) из документов
   reminder_worker.py  — фоновый asyncio-воркер: напоминания о матчах AI Sport через Telegram-бота
   telegram_setup.py   — при каждом старте сервера сам привязывает вебхук бота (setWebhook), вручную больше не нужно
@@ -57,6 +58,9 @@ app/web/            — бэкенд (FastAPI)
     billing.py          — /api/billing/* : тарифы (plans), чекаут (Stars/CryptoBot), статус подписки
     admin_plans.py      — /api/admin/plans/* : CRUD тарифов (только admin), история цен
     admin_users.py      — /api/admin/users/* : управление пользователями (только admin)
+    admin_dashboard.py  — /api/admin/dashboard : один аггрегатный GET со статистикой для
+                          главного экрана Admin-панели (только superadmin) — см. раздел
+                          "Admin-панель" ниже
     investors.py        — /api/investors/* : публичная витрина + admin CRUD инвесторов (с фото)
     referrals.py        — /api/referrals/* : реферальная статистика пользователя
     organizations.py    — /api/organizations/* : командные (business-тариф) аккаунты, приглашения
@@ -87,11 +91,23 @@ webapp/              — фронтенд (ванильный JS, ES-модул�
     profile/*.js           — каждый файл = один экран внутри Личного кабинета (см. таблицу ниже)
     docsApp.js             — раздел "AI Docs" (полноэкранный, свой стек экранов)
     sportApp.js            — раздел "AI Sport" (полноэкранный, свой стек экранов)
+    adminApp.js             — Admin-панель (полноэкранная, свой стек экранов) — см. раздел
+                              "Admin-панель" ниже. Открывается ТОЛЬКО из пункта меню в
+                              accountApp.js (через явный onClose-колбэк, не через navigation.js
+                              returnTarget — иначе был бы цикл импортов с accountApp.js)
     planCheckoutModal.js   — общая модалка оплаты тарифа (использует и docsApp, и sportApp — не дублировать!)
     authCard.js            — карточка входа/регистрации (показывается, если нет сессии)
     onboarding.js           — 3-шаговый онбординг при первом визите
-    investors.js, investorPanel.js, investorsAdmin.js — витрина инвесторов + админка (админка НЕ подключена в UI, см. "Известные незавершённости")
+    investors.js, investorPanel.js, investorsAdmin.js — витрина инвесторов + админка.
+      investorsAdmin.js теперь смонтирована — раздел "Инвесторы" внутри adminApp.js
+      вызывает mountInvestorsAdmin() напрямую (см. "Известные незавершённости" ниже:
+      этот пункт был закрыт, а не переписан заново)
     ledgerCard.js, hero.js, flywheelDiagram.js, timeline.js, partners.js, trust.js, tabs.js, legal.js, productDetail.js — секции дэшборда/экосистемы
+
+  src/api/                — HTTP-клиенты к бэкенду (не путать с src/config/*Api.js ниже)
+    authApi.js, investorsApi.js — существовавшие клиенты (auth/сессии; инвесторы+аудит-лог)
+    adminApi.js              — клиент Admin-панели: dashboard/users/plans/audit-log
+                                (с новым фильтром targetType)/manual-payments/organizations-all
 
   src/config/            — СТАТИЧНЫЙ контент и API-клиенты (не компоненты!)
     products.js, productDetails.js, partners.js, trust.js, roadmap.js, onboarding.js, legal.js, flywheel.js — тексты/данные для соответствующих компонентов
@@ -145,6 +161,52 @@ home-экран показывает список разделов (иконка
 колонку в существующую таблицу) — см. кортеж `_COLUMN_MIGRATIONS` в том же
 файле, он применяется отдельно через `ALTER TABLE ... ADD COLUMN IF NOT
 EXISTS` при каждом старте.
+
+## Admin-панель (полноэкранный раздел, `webapp/src/components/adminApp.js`)
+
+Отдельное полноэкранное приложение (свой `screenStack`, тот же паттерн, что
+`docsApp.js`/`sportApp.js`) — `view-admin-app` в `index.html`. Открывается
+ТОЛЬКО из пункта меню в `accountApp.js` (виден в списке, только если
+`user.role === 'admin' | 'superadmin'` — это UX-подсказка, реальная граница
+всегда бэкенд). Стили — `webapp/src/styles/adminApp.css`.
+
+Экраны: Дэшборд (домашний, `GET /api/admin/dashboard`, только superadmin) →
+Пользователи/роли → Тарифы (+ история цен) → Платежи (очередь ручных
+подтверждений) → Инвесторы (монтирует существующий `investorsAdmin.js`
+целиком, не переписан) → Журнал действий (аудит-лог) → Организации
+(read-only обзор всех организаций, опциональный п.9 исходного ТЗ).
+
+**Единственный по-настоящему новый бэкенд-эндпоинт** —
+`GET /api/admin/dashboard` (`app/web/api/admin_dashboard.py`, only
+superadmin): totalUsers/activeUsers7d/activeUsers30d/roleCounts/
+activeSubscriptions/pendingManualPayments/revenue30dUsd/
+otherCurrencyPayments30d. Выручка (`revenue30dUsd`) считается ЧЕСТНО —
+суммируются только платежи в USD/USDT (курс USDT к доллару стабилен по
+конструкции стейблкоина); TON/BTC/Stars НЕ конвертируются по придуманному
+курсу, а просто отдельно считаются в `otherCurrencyPayments30d` — тот же
+принцип "никаких выдуманных цифр", что у `predictions.py` в AI Sport.
+
+Остальное — переиспользование уже существовавших бэкенд-эндпоинтов
+(`admin_users.py`, `admin_plans.py`, `investors.py`,
+`/api/billing/admin/manual-payments*`), плюс три небольших добавления:
+- `targetType`-фильтр в `GET /api/admin/users/audit-log` (был только
+  `action`/`adminId`) — нужен для полноценного экрана "Журнал действий".
+- `GET /api/organizations/admin/all` — read-only список всех организаций +
+  число участников (только superadmin), т.к. `/api/organizations/me` видит
+  только СВОЮ организацию, list-all для этого не существовал.
+- `admin_confirm_manual_payment` (`billing.py`) раньше НЕ писал в
+  `admin_audit_log` — единственное мутирующее admin-действие без аудита.
+  Починено (`action="manual_payment_confirm"`).
+
+`/api/auth/me` (и `/register`/`/login`) теперь отдают ещё `role` (string) и
+`isSuperadmin` (bool) в объекте `user` — раньше был только `isAdmin` (bool),
+этого хватало для старого пункта меню "Инвесторы", но не хватало, чтобы
+на фронтенде различить admin/superadmin (см. `_public_user()` в `auth.py`).
+
+Тесты — `tests/test_admin_dashboard.py`. Лёгкий JS-регрессионный тест без
+браузера (jsdom + мок fetch) — `webapp/test/adminApp.harness.mjs` (см.
+комментарий в начале файла, как запустить — jsdom не входит в рантайм
+проекта, только dev-инструмент).
 
 ## Оплата — способы
 
@@ -246,9 +308,10 @@ docx не встраивает шрифт, использует тот, что �
 
 ## Известные незавершённости / долг (на момент последнего обновления этого файла)
 
-- `investorsAdmin.js` существует, но никуда не подключён в UI — админ пока
-  не может добавить инвестора через интерфейс, только через прямой SQL/
-  `scripts/seed_single_investor.py`.
+- ~~`investorsAdmin.js` существует, но никуда не подключён в UI~~ — закрыто:
+  теперь смонтирована внутри Admin-панели (`adminApp.js`, раздел "Инвесторы"),
+  см. новый раздел "Admin-панель" ниже. Файл `investorsAdmin.js` не
+  переписывался, только подключён.
 - ClearSports (`clearsports.py`) — часть путей API подобрана по аналогии,
   официальная документация недоступна для автоматического скачивания;
   если увидите в логах Railway ошибки от clearsports.py — проверьте путь

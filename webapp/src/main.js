@@ -177,19 +177,14 @@ async function ensureAuthenticated() {
     }
   }
 
-  // Внутри Telegram initData уже подписана клиентом — тихий вход без формы.
-  if (isInsideTelegram()) {
-    try {
-      const result = await authApi.loginWithTelegram();
-      setToken(result.token);
-      onAuthed(result.user);
-      return;
-    } catch (e) {
-      captureException(e, { stage: 'telegram-silent-login' });
-      // падаем в форму входа ниже — снаружи Telegram или SDK не подтвердил initData
-    }
-  }
-
+  // Раньше здесь был тихий автовход через Telegram без вопросов (initData уже
+  // подписана клиентом внутри Mini App) — это создавало аккаунт через ТГ
+  // молча, ещё до того как человек успевал выбрать способ входа. Теперь
+  // всегда показываем карточку выбора: внутри Telegram на ней есть кнопка
+  // "Продолжить с Telegram" (одно нажатие — тот же loginWithTelegram()), но
+  // рядом видны email/Google/Яндекс — выбор за пользователем. Если выбран
+  // способ отличный от Telegram, привязку Telegram-аккаунта потом предложит
+  // maybeShowTelegramLinkBanner() в onAuthed() ниже.
   mountAuthCard(authRoot, onAuthed);
 }
 

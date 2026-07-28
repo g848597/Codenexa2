@@ -165,7 +165,7 @@ function methodStepHTML() {
   const inTg = isInsideTelegram();
 
   return `
-  ${headerHTML(esc(t('pp_method_title')), esc(t('pp_method_sub_plan')(plan.title, plan.usd)), showBack)}
+  ${headerHTML(esc(t('pp_method_title')), esc(t('pp_method_sub_plan', plan.title, plan.usd)), showBack)}
   ${ui.error ? `<div class="pp-error">${icon('alertTriangle')} ${esc(ui.error)}</div>` : ''}
   <div class="pp-method-grid">
     ${inTg ? `

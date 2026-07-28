@@ -127,6 +127,54 @@ def search_users(query: str, limit: int = 20):
     )
 
 
+def get_admin_dashboard_stats() -> dict:
+    """Один аггрегатный запрос-набор для дэшборда админ-панели (см.
+    app/web/api/admin_dashboard.py) — вместо того, чтобы фронтенд дёргал
+    полдесятка отдельных эндпоинтов при каждом открытии главного экрана.
+
+    Честная выручка (тот же принцип, что и в integrations/predictions.py:
+    "никаких выдуманных цифр"): суммируем только USD и USDT — курс USDT к
+    доллару стабилен по конструкции самого стейблкоина, а TON/BTC/Stars НЕ
+    конвертируем по произвольно выбранному курсу, а просто честно считаем
+    отдельным счётчиком "прочих" оплаченных платежей."""
+    total_users = _fetch_one("SELECT COUNT(*) AS n FROM users")["n"]
+    active_7d = _fetch_one(
+        "SELECT COUNT(*) AS n FROM users WHERE last_login_at > NOW() - INTERVAL '7 days'"
+    )["n"]
+    active_30d = _fetch_one(
+        "SELECT COUNT(*) AS n FROM users WHERE last_login_at > NOW() - INTERVAL '30 days'"
+    )["n"]
+    role_counts = {
+        r["role"]: r["n"]
+        for r in _fetch_all("SELECT role, COUNT(*) AS n FROM users GROUP BY role")
+    }
+    active_subscriptions = _fetch_one(
+        "SELECT COUNT(DISTINCT user_id) AS n FROM payments WHERE status = 'paid' "
+        "AND (expires_at IS NULL OR expires_at > NOW())"
+    )["n"]
+    pending_manual_payments = _fetch_one(
+        "SELECT COUNT(*) AS n FROM payments WHERE provider IN ('card', 'crypto_manual') AND status = 'pending'"
+    )["n"]
+    revenue_30d_usd = _fetch_one(
+        "SELECT COALESCE(SUM(amount), 0) AS s FROM payments WHERE status = 'paid' "
+        "AND paid_at > NOW() - INTERVAL '30 days' AND currency IN ('USD', 'USDT')"
+    )["s"]
+    other_currency_payments_30d = _fetch_one(
+        "SELECT COUNT(*) AS n FROM payments WHERE status = 'paid' "
+        "AND paid_at > NOW() - INTERVAL '30 days' AND currency NOT IN ('USD', 'USDT')"
+    )["n"]
+    return {
+        "total_users": total_users,
+        "active_users_7d": active_7d,
+        "active_users_30d": active_30d,
+        "role_counts": role_counts,
+        "active_subscriptions": active_subscriptions,
+        "pending_manual_payments": pending_manual_payments,
+        "revenue_30d_usd": revenue_30d_usd,
+        "other_currency_payments_30d": other_currency_payments_30d,
+    }
+
+
 # --- sessions ---
 
 # Кэш is_session_valid() (Redis, опционально) — см. аудит, раздел 2, "Где
@@ -570,10 +618,17 @@ def log_admin_action(
         )
 
 
-def list_audit_log(limit: int = 50, offset: int = 0, action: str | None = None, admin_id: int | None = None):
+def list_audit_log(
+    limit: int = 50,
+    offset: int = 0,
+    action: str | None = None,
+    admin_id: int | None = None,
+    target_type: str | None = None,
+):
     """Постранично, самые новые записи первыми. Фильтры необязательны и
     комбинируются (AND) — используются панелью аудита для сужения выборки
-    по типу действия и/или конкретному админу."""
+    по типу действия, типу объекта и/или конкретному админу (см. новый
+    экран "Журнал действий" в webapp/src/components/adminApp.js)."""
     conn = get_conn()
     clauses = []
     params: list = []
@@ -583,6 +638,9 @@ def list_audit_log(limit: int = 50, offset: int = 0, action: str | None = None, 
     if admin_id is not None:
         clauses.append("a.admin_id = ?")
         params.append(admin_id)
+    if target_type:
+        clauses.append("a.target_type = ?")
+        params.append(target_type)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     params.extend([limit, offset])
     rows = conn.execute(
@@ -600,7 +658,11 @@ def list_audit_log(limit: int = 50, offset: int = 0, action: str | None = None, 
     return [row_to_dict(r) for r in rows]
 
 
-def count_audit_log(action: str | None = None, admin_id: int | None = None) -> int:
+def count_audit_log(
+    action: str | None = None,
+    admin_id: int | None = None,
+    target_type: str | None = None,
+) -> int:
     conn = get_conn()
     clauses = []
     params: list = []
@@ -610,6 +672,9 @@ def count_audit_log(action: str | None = None, admin_id: int | None = None) -> i
     if admin_id is not None:
         clauses.append("admin_id = ?")
         params.append(admin_id)
+    if target_type:
+        clauses.append("target_type = ?")
+        params.append(target_type)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     row = conn.execute(f"SELECT COUNT(*) AS c FROM admin_audit_log {where}", tuple(params)).fetchone()
     return row_to_dict(row)["c"]
@@ -804,6 +869,22 @@ def create_organization(name: str, owner_user_id: int, plan_code: str):
 
 def get_organization(org_id: int):
     return _fetch_one("SELECT * FROM organizations WHERE id = ?", (org_id,))
+
+
+def list_organizations_overview():
+    """Только для superadmin-обзора (см. app/web/api/organizations.py::
+    admin_list_all_organizations, пункт 9 admin_panel_build_prompt.md).
+    `/api/organizations/me` намеренно видит только СВОЮ организацию —
+    здесь отдельный read-only список всех организаций + число участников,
+    без деталей о конкретных сотрудниках (это обзорный экран, не панель
+    управления чужими организациями)."""
+    return _fetch_all(
+        "SELECT o.*, u.email AS owner_email, u.first_name AS owner_first_name, "
+        "u.last_name AS owner_last_name, "
+        "(SELECT COUNT(*) FROM organization_members m WHERE m.org_id = o.id) AS member_count "
+        "FROM organizations o LEFT JOIN users u ON u.id = o.owner_user_id "
+        "ORDER BY o.created_at DESC"
+    )
 
 
 def get_user_membership(user_id: int):

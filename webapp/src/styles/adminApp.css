@@ -1,0 +1,161 @@
+/* adminApp.css — визуал полноэкранной Admin-панели (components/adminApp.js).
+   Тот же дизайн-язык и токены, что и в profileHub.css/sportHome.css — своя
+   таблица стилей (не app.css), т.к. это самостоятельный полноэкранный раздел,
+   а не мелкая секция дэшборда (тот же принцип, что у paymentPage.css). */
+
+.admin-app { padding-bottom: 24px; }
+
+/* ---------- шапка (back/exit) ---------- */
+
+.ad-topbar { display: flex; align-items: center; padding: 4px 0 14px; }
+.ad-back,
+.ad-exit {
+  display: inline-flex; align-items: center; gap: 6px; background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 13px; font-weight: 600; padding: 6px 4px;
+  transition: color .2s var(--ease);
+}
+.ad-back:hover, .ad-exit:hover { color: var(--text); }
+.ad-exit svg { width: 16px; height: 16px; }
+
+/* ---------- главный экран: hero + дэшборд ---------- */
+
+.ad-hero {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 22px; padding: 18px;
+  border-radius: var(--radius-lg); border: var(--border-glass);
+  background: var(--gradient-surface), var(--bg-card); box-shadow: var(--shadow-card, 0 14px 34px -26px rgba(0,0,0,0.5));
+}
+.ad-hero-icon {
+  flex: none; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  background: var(--gradient-ledger); color: var(--on-ledger); box-shadow: var(--glow-ledger);
+}
+.ad-hero-icon svg { width: 22px; height: 22px; }
+.ad-hero-title { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+.ad-hero-sub { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+
+.ad-section-title { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; margin: 0 0 10px 2px; }
+
+.ad-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (max-width: 380px) { .ad-stats-grid { grid-template-columns: 1fr; } }
+.ad-stat-card {
+  display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: var(--radius-md);
+  border: 1px solid var(--line); background: var(--bg-elevated);
+}
+.ad-stat-icon { color: var(--ledger); }
+.ad-stat-icon svg { width: 17px; height: 17px; }
+.ad-stat-value { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+.ad-stat-label { font-size: 11px; color: var(--text-faint); }
+
+.ad-role-breakdown { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--text-faint); }
+.ad-role-chip { font-size: 11px; font-family: var(--font-mono); padding: 4px 9px; border-radius: 8px; background: var(--bg-elevated); border: 1px solid var(--line); color: var(--text-dim); }
+
+.ad-hint { font-size: 11.5px; color: var(--text-faint); line-height: 1.5; margin-top: 10px; }
+.ad-note { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-faint); padding: 14px; border-radius: var(--radius-md); border: 1px dashed var(--line-strong); background: var(--bg-elevated); }
+.ad-note svg { width: 16px; height: 16px; flex: none; }
+
+/* ---------- навигация по разделам (переиспользует hub-menu-* вёрстку) ---------- */
+
+.ad-row-list { border-radius: var(--radius-lg); border: var(--border-glass); background: var(--bg-card); overflow: hidden; box-shadow: var(--shadow-card, 0 14px 34px -26px rgba(0,0,0,0.5)); }
+.ad-menu-row { display: flex; align-items: center; gap: 14px; padding: 16px; border-bottom: 1px solid var(--line); cursor: pointer; background: none; width: 100%; text-align: left; color: var(--text); transition: background .2s var(--ease); }
+.ad-menu-row:last-child { border-bottom: none; }
+.ad-menu-row:hover { background: rgba(255,255,255,.035); }
+.ad-menu-icon { flex: none; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--gradient-surface), var(--bg-elevated); color: var(--ledger); border: 1px solid var(--line); }
+.ad-menu-icon svg { width: 20px; height: 20px; }
+.ad-menu-main { flex: 1; min-width: 0; }
+.ad-menu-title { font-family: var(--font-display); font-size: 14.5px; font-weight: 600; }
+.ad-menu-sub { font-size: 11.5px; color: var(--text-faint); margin-top: 3px; }
+.ad-menu-badge { flex: none; font-size: 11px; font-weight: 700; color: var(--on-ledger); background: var(--gradient-ledger); border-radius: 10px; padding: 3px 9px; box-shadow: var(--glow-ledger); }
+.ad-menu-chevron { flex: none; color: var(--text-faint); }
+.ad-menu-chevron svg { width: 14px; height: 14px; transform: rotate(180deg); }
+
+/* ---------- экраны-разделы ---------- */
+
+.ad-screen-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.ad-screen-title svg { width: 17px; height: 17px; color: var(--ledger); }
+
+.ad-loading, .ad-error { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 16px; text-align: center; color: var(--text-dim); font-size: 13px; }
+.ad-spinner { width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid var(--line-strong); border-top-color: var(--ledger); animation: ad-spin 0.8s linear infinite; }
+@keyframes ad-spin { to { transform: rotate(360deg); } }
+.ad-error p { display: flex; align-items: center; gap: 6px; }
+.ad-btn-secondary { padding: 9px 16px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong); background: var(--bg-elevated); color: var(--text); font-size: 12.5px; cursor: pointer; }
+.ad-empty { padding: 30px 16px; text-align: center; color: var(--text-faint); font-size: 12.5px; }
+
+.ad-search-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.ad-input {
+  flex: 1; min-width: 0; font-size: 13px; padding: 10px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong); background: var(--bg-elevated); color: var(--text); font-family: inherit;
+}
+.ad-input:focus { outline: none; border-color: var(--ledger); }
+
+.ad-btn { padding: 10px 16px; border-radius: var(--radius-sm); font-weight: 600; font-size: 12.5px; cursor: pointer; border: 1px solid transparent; }
+.ad-btn-primary { background: var(--gradient-ledger); color: var(--on-ledger); box-shadow: var(--glow-ledger); }
+.ad-btn-primary:disabled { opacity: .6; cursor: default; box-shadow: none; }
+.ad-btn-danger { background: var(--danger, #e5484d); color: #fff; }
+
+.ad-list { display: flex; flex-direction: column; gap: 8px; }
+.ad-card { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--bg-elevated); }
+
+/* ---------- пользователи / роли ---------- */
+
+.ad-user-row { flex-wrap: wrap; }
+.ad-user-main { flex: 1; min-width: 140px; }
+.ad-user-name { font-size: 13.5px; font-weight: 600; }
+.ad-user-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+
+.ad-role-badge { flex: none; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 4px 9px; border-radius: 9px; font-family: var(--font-mono); }
+.ad-role-badge-user { background: var(--bg-card); color: var(--text-faint); border: 1px solid var(--line-strong); }
+.ad-role-badge-admin { background: var(--steel-dim); color: var(--steel); }
+.ad-role-badge-superadmin { background: var(--gradient-ledger); color: var(--on-ledger); }
+
+.ad-role-select {
+  flex: none; font-size: 12px; padding: 7px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong); background: var(--bg-card); color: var(--text);
+}
+
+.ad-confirm-banner {
+  display: flex; flex-direction: column; gap: 10px; padding: 14px; margin-bottom: 12px; border-radius: var(--radius-md);
+  border: 1px solid var(--amber, #f5a623); background: var(--amber-dim);
+}
+.ad-confirm-banner span { font-size: 12.5px; color: var(--text); display: flex; align-items: flex-start; gap: 8px; }
+.ad-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ---------- тарифы ---------- */
+
+.ad-form-card { margin: 14px 0; padding: 16px; border-radius: var(--radius-md); border: var(--border-glass); background: var(--bg-card); display: flex; flex-direction: column; gap: 8px; }
+.ad-form-title { font-family: var(--font-display); font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.ad-form-card label { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+.ad-form-hint { font-size: 10.5px; color: var(--text-faint); }
+.ad-inline-error { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--amber); margin-top: 4px; }
+
+.ad-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ad-table th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); padding: 8px 10px; border-bottom: 1px solid var(--line-strong); }
+.ad-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); color: var(--text-dim); }
+.ad-table tr.ad-row-active td { color: var(--text); font-weight: 600; }
+.ad-table tr:last-child td { border-bottom: none; }
+
+/* Мобильный вид: таблицы становятся стопкой карточек, а не горизонтальным
+   скроллом (см. admin_panel_build_prompt.md: "Tables become stacked cards
+   below a breakpoint rather than horizontally scrolling if that's ugly"). */
+@media (max-width: 460px) {
+  .ad-table thead { display: none; }
+  .ad-table, .ad-table tbody, .ad-table tr, .ad-table td { display: block; width: 100%; }
+  .ad-table tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .ad-table td { border-bottom: none; padding: 3px 0; }
+  .ad-table td::before { content: attr(data-label); display: inline-block; min-width: 84px; color: var(--text-faint); font-size: 10.5px; text-transform: uppercase; }
+}
+
+.ad-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; font-size: 11.5px; color: var(--text-faint); }
+
+/* ---------- платежи ---------- */
+
+.ad-payment-row { flex-wrap: wrap; }
+.ad-payment-amount { flex: none; font-family: var(--font-mono); font-weight: 700; font-size: 14px; color: var(--ledger); }
+
+/* ---------- организации ---------- */
+
+.ad-org-row { }
+.ad-org-members { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-faint); }
+.ad-org-members svg { width: 14px; height: 14px; }
+
+/* ---------- инвесторы (мountInvestorsAdmin монтируется прямо сюда) ---------- */
+
+#ad-investors-mount { margin-top: 4px; }

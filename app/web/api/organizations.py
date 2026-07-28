@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
 from app.web import repo
-from app.web.deps import get_current_user
+from app.web.deps import get_current_superadmin, get_current_user
 
 router = APIRouter(prefix="/api/organizations", tags=["organizations"])
 
@@ -63,6 +63,35 @@ def get_my_organization(user: dict = Depends(get_current_user)):
             "myRole": membership["role"],
         },
         "members": [_member_shape(m) for m in members],
+    }
+
+
+@router.get("/admin/all")
+def admin_list_all_organizations(_admin: dict = Depends(get_current_superadmin)):
+    """Read-only обзор ВСЕХ организаций для Admin-панели (см.
+    admin_panel_build_prompt.md, п.9, "Organizations overview" — опционально,
+    добавлено т.к. `/api/organizations/me` намеренно видит только СВОЮ
+    организацию и list-all для этого раньше не существовало). Только
+    superadmin: это не CRUD, никаких мутирующих действий здесь нет, поэтому
+    log_action() не нужен — тот же принцип, что и у публичного
+    list_public_investors() в investors.py."""
+    rows = repo.list_organizations_overview()
+    return {
+        "organizations": [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "planCode": r["plan_code"],
+                "ownerEmail": r.get("owner_email"),
+                "ownerName": " ".join(
+                    p for p in [r.get("owner_first_name"), r.get("owner_last_name")] if p
+                )
+                or None,
+                "memberCount": r["member_count"],
+                "createdAt": r["created_at"],
+            }
+            for r in rows
+        ]
     }
 
 

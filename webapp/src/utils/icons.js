@@ -65,6 +65,10 @@ const PATHS = {
   chevronRight: '<polyline points="9.5 5 16 12 9.5 19"/>',
   sliders: '<line x1="4" y1="6" x2="7.2" y2="6"/><circle cx="9.3" cy="6" r="2.1"/><line x1="11.4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="13" y2="12"/><circle cx="15.1" cy="12" r="2.1"/><line x1="17.2" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="9.2" y2="18"/><circle cx="11.3" cy="18" r="2.1"/><line x1="13.4" y1="18" x2="20" y2="18"/>',
   externalLink: '<path d="M9.5 5.5H5.8A1.3 1.3 0 0 0 4.5 6.8v11.4a1.3 1.3 0 0 0 1.3 1.3h11.4a1.3 1.3 0 0 0 1.3-1.3V14.5"/><path d="M13.5 3.5H20.5V10.5"/><line x1="11" y1="13" x2="20.2" y2="3.8"/>',
+
+  // Admin-панель (см. components/adminApp.js)
+  gauge: '<circle cx="12" cy="13" r="8.2"/><path d="M12 13 15.5 8.8"/><path d="M8 5.2 9 6.6M16 5.2 15 6.6M4.5 13H6M18 13h1.5"/>',
+  tag: '<path d="M11.5 3.5h5A2 2 0 0 1 18.5 5.5v5a2 2 0 0 1-.6 1.4l-7 7a2 2 0 0 1-2.8 0l-4.9-4.9a2 2 0 0 1 0-2.8l7-7a2 2 0 0 1 1.3-.6z" stroke-linejoin="round"/><circle cx="14.2" cy="8.8" r="1.1" fill="currentColor" stroke="none"/>',
 };
 
 /**

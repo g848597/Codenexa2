@@ -15,7 +15,7 @@ from app.web import referrals, repo, security
 from app.web.api.telegram_auth import validate_init_data
 from app.web.cache import get_redis
 from app.web.config import settings
-from app.web.deps import _apply_admin_bootstrap, get_current_user, is_admin_user
+from app.web.deps import _apply_admin_bootstrap, get_current_user, is_admin_user, is_superadmin_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = logging.getLogger("codenexa.auth")
@@ -108,6 +108,15 @@ def _public_user(user: dict) -> dict:
         "twoFaEnabled": bool(user.get("totp_enabled")),
         "createdAt": user.get("created_at"),
         "isAdmin": is_admin_user(user),
+        # Раунд 9 (Admin-панель, admin_panel_build_prompt.md, п.2): раньше
+        # наружу отдавался только isAdmin (bool) — этого хватало, чтобы
+        # решить "показывать ли пункт меню инвесторов", но не хватает, чтобы
+        # различить admin/superadmin на фронтенде (например, скрыть экраны
+        # "Пользователи"/"Тарифы"/"Аудит", которые бэкенд и так отдаст 403
+        # обычному admin). Это ТОЛЬКО UX-подсказка — реальная граница
+        # остаётся на бэкенде (get_current_admin/get_current_superadmin).
+        "role": user.get("role") or "user",
+        "isSuperadmin": is_superadmin_user(user),
     }
 
 

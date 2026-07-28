@@ -328,7 +328,7 @@ function heroInvestedHTML(currencyTotals) {
   <div class="inv-hero-stat">
     <span class="l">${t('inv_amount_hero_label')}</span>
     <span class="v" data-currency-cents="${Math.round(top.total * 100)}" data-currency="${escAttr(top.currency)}">${formatAmount(0, top.currency)}</span>
-    ${rest > 0 ? `<span class="more">${t('inv_amount_hero_more')(rest)}</span>` : ''}
+    ${rest > 0 ? `<span class="more">${t('inv_amount_hero_more', rest)}</span>` : ''}
   </div>`;
 }
 

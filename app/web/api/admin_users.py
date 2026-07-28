@@ -109,12 +109,21 @@ def get_audit_log(
     offset: int = Query(default=0, ge=0),
     action: str | None = Query(default=None, max_length=100),
     adminId: int | None = Query(default=None),  # noqa: N803 — camelCase на границе с фронтендом
+    targetType: str | None = Query(default=None, max_length=50),  # noqa: N803
     _admin: dict = Depends(get_current_superadmin),
 ):
     """Только superadmin — сам аудит-лог о действиях админов является
-    чувствительными данными (кто что менял), не для обычного admin."""
-    rows = repo.list_audit_log(limit=limit, offset=offset, action=action, admin_id=adminId)
-    total = repo.count_audit_log(action=action, admin_id=adminId)
+    чувствительными данными (кто что менял), не для обычного admin.
+
+    targetType — дополнительный фильтр (добавлен вместе с полноценным
+    экраном "Журнал действий" в новой Admin-панели, см.
+    webapp/src/components/adminApp.js) — например 'user'/'plan'/'investor'/
+    'manual_payment', чтобы сузить выборку по типу объекта, а не только по
+    названию действия."""
+    rows = repo.list_audit_log(
+        limit=limit, offset=offset, action=action, admin_id=adminId, target_type=targetType
+    )
+    total = repo.count_audit_log(action=action, admin_id=adminId, target_type=targetType)
     return {
         "entries": [
             {

@@ -6,8 +6,6 @@
 // для обратной совместимости, но карточка теперь показывает настоящий статус.
 import { t } from '../../i18n.js';
 import { fmtDate } from '../../utils/format.js';
-import { authApi } from '../../api/authApi.js';
-import { openPaymentPage } from '../paymentPage.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -70,32 +68,22 @@ function lastPlanCodeMatch(code, planList) {
   return planList.some((p) => p.code === code) ? code : null;
 }
 
-export function bindSubscriptionCard(root, scrollTargetId, plans, onSuccess) {
+// isActive: если подписка активна — кнопка "Управлять" просто прокручивает
+// к истории платежей ниже на этом же экране. Если подписки нет/истекла —
+// кнопка "Посмотреть тарифы" ОБЯЗАНА открыть настоящую страницу выбора
+// тарифа (см. main.js/paymentPage.js), а не просто скроллить — раньше она
+// вела на тот же блок с историей платежей, где тарифов могло не быть видно
+// (пустая история для нового юзера) => клик выглядел так, будто "не работает".
+export function bindSubscriptionCard(root, opts) {
+  const { scrollTargetId, isActive, onViewPlans } = opts || {};
   const btn = root.querySelector('[data-hub-manage-sub]');
   if (!btn) return;
-
-  // Раньше эта кнопка просто скроллила к истории платежей вместо того,
-  // чтобы реально открыть выбор тарифа — историю платежей всё равно видно
-  // ниже на этом же экране, а вот купить/сменить тариф было НЕЛЬЗЯ отсюда
-  // вообще (см. историю чата: "клик по тарифу должен вести на спец
-  // страницу, но не работает"). Если список тарифов почему-то не загрузился
-  // — честно скроллим к разделу оплаты (там есть история и понятно, что
-  // происходит), а не показываем пустое окно.
-  const planList = (plans && plans.plans) || [];
-  if (!planList.length) {
-    btn.addEventListener('click', () => {
-      const target = document.getElementById(scrollTargetId);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    return;
-  }
-
   btn.addEventListener('click', () => {
-    openPaymentPage({
-      plans: planList,
-      checkout: (code, method, extra) => authApi.checkout(code, method, extra, crypto.randomUUID()),
-      getManualMethods: () => authApi.getManualMethods(),
-      onSuccess: onSuccess || (() => {}),
-    });
+    if (!isActive && typeof onViewPlans === 'function') {
+      onViewPlans();
+      return;
+    }
+    const target = document.getElementById(scrollTargetId);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 }

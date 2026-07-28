@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 
 from app.web import money, referrals, repo
+from app.web.audit import log_action
 from app.web.config import settings
 from app.web.deps import get_current_admin, get_current_user
 from app.web.integrations import cryptobot, stars
@@ -318,7 +319,7 @@ async def admin_pending_manual_payments(_admin: dict = Depends(get_current_admin
 
 
 @router.post("/admin/manual-payments/{payment_id}/confirm")
-async def admin_confirm_manual_payment(payment_id: int, admin: dict = Depends(get_current_admin)):
+async def admin_confirm_manual_payment(payment_id: int, request: Request, admin: dict = Depends(get_current_admin)):
     """Подтверждает вручную сверенный платёж — активирует тариф пользователю
     (см. repo.confirm_manual_payment: тот же расчёт expires_at, что и в
     mark_payment_paid для cryptobot-вебхука)."""
@@ -327,4 +328,17 @@ async def admin_confirm_manual_payment(payment_id: int, admin: dict = Depends(ge
         raise HTTPException(status_code=404, detail="Заявка не найдена или уже обработана")
     await run_in_threadpool(referrals.maybe_confirm_referral, paid_user_id)
     logger.info("Admin %s подтвердил ручной платёж #%s (user %s)", admin["id"], payment_id, paid_user_id)
+    # Раньше это была единственная мутирующая admin-операция без записи в
+    # аудит-лог (пропуск, а не осознанное решение — см. admin_panel_build_
+    # prompt.md, "Security / correctness constraints") — деньги, которые
+    # админ вручную подтверждает, точно должны быть в audit trail, как и
+    # смена ролей/цен/CRUD инвесторов.
+    log_action(
+        request,
+        admin,
+        action="manual_payment_confirm",
+        target_type="manual_payment",
+        target_id=payment_id,
+        details={"userId": paid_user_id},
+    )
     return {"ok": True}
