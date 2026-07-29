@@ -63,6 +63,10 @@ function freshState() {
       loaded: false, loading: false, error: null, query: '', list: [],
       pendingChange: null, // { userId, role } — ждёт подтверждения (см. renderUsers)
       busyId: null,
+      // Пагинация (см. app/web/api/admin_users.py::list_or_search_users) —
+      // список теперь ВСЕ пользователи системы, а не только admin/superadmin,
+      // так что бесконечная страница без пагинации не годится.
+      offset: 0, pageSize: 20, total: 0,
     },
     plans: {
       loaded: false, loading: false, error: null, list: [],
@@ -102,7 +106,13 @@ function current() {
 }
 
 function ensureScreenData(name) {
-  if (name === 'users' && !state.users.loaded) loadUsers();
+  if (name === 'users') {
+    if (!state.users.loaded) loadUsers();
+    // Список активных тарифов нужен для <select> смены тарифа в userRowHTML —
+    // грузим его тем же способом, что и для экрана "Тарифы" (не дублируем
+    // отдельный endpoint, GET /api/admin/plans и так уже superadmin-only).
+    if (!state.plans.loaded) loadPlans();
+  }
   if (name === 'plans' && !state.plans.loaded) loadPlans();
   if (name === 'payments' && !state.payments.loaded) loadPayments();
   if (name === 'audit' && !state.audit.loaded) loadAudit();
@@ -128,15 +138,18 @@ async function loadDashboard() {
   render();
 }
 
-async function loadUsers(query) {
+async function loadUsers(query, offset) {
   const q = query !== undefined ? query : state.users.query;
-  state.users = { ...state.users, loading: true, error: null, query: q };
+  // Новый поиск — со страницы 0; листание страниц (offset передан явно и
+  // query не менялся) — сохраняем текущий offset.
+  const nextOffset = offset !== undefined ? offset : query !== undefined ? 0 : state.users.offset;
+  state.users = { ...state.users, loading: true, error: null, query: q, offset: nextOffset };
   render();
   try {
-    const { users } = await adminApi.listUsers(q);
-    state.users = { ...state.users, loaded: true, loading: false, error: null, list: users };
+    const { users, total } = await adminApi.listUsers({ q, limit: state.users.pageSize, offset: nextOffset });
+    state.users = { ...state.users, loaded: true, loading: false, error: null, list: users, total: total ?? users.length };
   } catch (err) {
-    state.users = { ...state.users, loaded: true, loading: false, error: forbiddenMessage(err), list: [] };
+    state.users = { ...state.users, loaded: true, loading: false, error: forbiddenMessage(err), list: [], total: 0 };
   }
   render();
 }
@@ -299,8 +312,15 @@ function roleChipClass(role) {
   return `ad-role-badge ad-role-badge-${role}`;
 }
 
+function planBadgeHTML(u) {
+  if (!u.planCode) return `<span class="ad-plan-badge is-none">${t('ad_plan_none')}</span>`;
+  const expiryText = u.planExpiresAt ? t('ad_plan_until', formatDate(u.planExpiresAt)) : t('ad_plan_lifetime');
+  return `<span class="ad-plan-badge">${esc(u.planTitle || u.planCode)}</span><span class="ad-plan-expiry">${esc(expiryText)}</span>`;
+}
+
 function userRowHTML(u) {
   const busy = state.users.busyId === u.id;
+  const plans = state.plans.list || [];
   return `
   <div class="ad-card ad-user-row" data-user-id="${u.id}">
     <div class="ad-user-main">
@@ -308,9 +328,16 @@ function userRowHTML(u) {
       <div class="ad-user-meta">${esc(u.email || '—')}${u.telegramId ? ` · tg:${esc(String(u.telegramId))}` : ''}</div>
     </div>
     <span class="${roleChipClass(u.role)}">${t('ad_role_' + u.role)}</span>
-    <select class="ad-role-select" data-role-select="${u.id}" ${busy ? 'disabled' : ''}>
-      ${ROLE_OPTIONS.map((r) => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${t('ad_role_' + r)}</option>`).join('')}
-    </select>
+    ${planBadgeHTML(u)}
+    <div class="ad-user-controls">
+      <select class="ad-role-select" data-role-select="${u.id}" ${busy ? 'disabled' : ''}>
+        ${ROLE_OPTIONS.map((r) => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${t('ad_role_' + r)}</option>`).join('')}
+      </select>
+      <select class="ad-plan-select" data-plan-select="${u.id}" ${busy ? 'disabled' : ''}>
+        <option value="" ${!u.planCode ? 'selected' : ''}>${t('ad_plan_none')}</option>
+        ${plans.map((p) => `<option value="${escAttr(p.code)}" ${p.code === u.planCode ? 'selected' : ''}>${esc(p.title)}</option>`).join('')}
+      </select>
+    </div>
   </div>`;
 }
 
@@ -338,6 +365,12 @@ function renderUsers() {
     ${!s.query ? `<div class="ad-hint">${t('ad_users_default_hint')}</div>` : ''}
     ${pendingChangeBannerHTML()}
     ${s.loading ? loadingHTML() : s.error ? errorHTML(s.error) : s.list.length ? `<div class="ad-list">${s.list.map(userRowHTML).join('')}</div>` : `<div class="ad-empty">${t('ad_users_empty')}</div>`}
+    ${!s.loading && !s.error && s.total > s.pageSize ? `
+    <div class="ad-pager">
+      <button class="ad-btn ad-btn-secondary" id="ad-users-prev" type="button" ${s.offset === 0 ? 'disabled' : ''}>${t('ad_users_prev_page')}</button>
+      <span>${t('ad_users_page_of', s.offset, s.pageSize, s.total)}</span>
+      <button class="ad-btn ad-btn-secondary" id="ad-users-next" type="button" ${s.offset + s.pageSize >= s.total ? 'disabled' : ''}>${t('ad_users_next_page')}</button>
+    </div>` : ''}
   `;
 }
 
@@ -366,6 +399,16 @@ function bindUsers() {
     });
   });
 
+  root.querySelectorAll('[data-plan-select]').forEach((sel) => {
+    sel.addEventListener('change', () => {
+      const userId = Number(sel.dataset.planSelect);
+      const user = state.users.list.find((u) => u.id === userId);
+      const planCode = sel.value || null; // пустая опция ("Без тарифа") -> отзыв
+      if (!user || planCode === (user.planCode || null)) return;
+      applyPlanChange(userId, planCode);
+    });
+  });
+
   const cancelBtn = root.querySelector('[data-role-cancel]');
   if (cancelBtn) cancelBtn.addEventListener('click', () => { state.users.pendingChange = null; render(); });
   const confirmBtn = root.querySelector('[data-role-confirm]');
@@ -374,6 +417,11 @@ function bindUsers() {
     state.users.pendingChange = null;
     if (pc) applyRoleChange(pc.userId, pc.role);
   });
+
+  const prevBtn = root.querySelector('#ad-users-prev');
+  if (prevBtn) prevBtn.addEventListener('click', () => { haptic('light'); loadUsers(state.users.query, Math.max(0, state.users.offset - state.users.pageSize)); });
+  const nextBtn = root.querySelector('#ad-users-next');
+  if (nextBtn) nextBtn.addEventListener('click', () => { haptic('light'); loadUsers(state.users.query, state.users.offset + state.users.pageSize); });
 }
 
 async function applyRoleChange(userId, role) {
@@ -383,7 +431,22 @@ async function applyRoleChange(userId, role) {
     await adminApi.setUserRole(userId, role);
     haptic('light');
     state.users.busyId = null;
-    await loadUsers();
+    await loadUsers(state.users.query, state.users.offset);
+  } catch (err) {
+    showAlert(err.message || t('ad_load_error'));
+    state.users.busyId = null;
+    render();
+  }
+}
+
+async function applyPlanChange(userId, planCode) {
+  state.users.busyId = userId;
+  render();
+  try {
+    await adminApi.setUserPlan(userId, planCode);
+    haptic('light');
+    state.users.busyId = null;
+    await loadUsers(state.users.query, state.users.offset);
   } catch (err) {
     showAlert(err.message || t('ad_load_error'));
     state.users.busyId = null;
@@ -604,7 +667,7 @@ function mountInvestorsIfNeeded() {
 
 const AUDIT_ACTIONS = [
   'create', 'update', 'delete', 'reorder', 'photo_upload', 'photo_delete',
-  'role_change', 'plan_price_change', 'manual_payment_confirm',
+  'role_change', 'plan_price_change', 'plan_grant', 'manual_payment_confirm',
 ];
 const AUDIT_TARGET_TYPES = ['user', 'plan', 'investor', 'manual_payment'];
 

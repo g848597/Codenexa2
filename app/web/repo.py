@@ -127,6 +127,128 @@ def search_users(query: str, limit: int = 20):
     )
 
 
+# --- пользователи + текущий тариф (экран "Пользователи" Admin-панели,
+# см. app/web/api/admin_users.py) ---
+#
+# Раньше GET /api/admin/users без ?q= показывал только тех, у кого УЖЕ есть
+# роль admin/superadmin (list_admins выше) — подходило для узкой задачи
+# "управление ролями", но не для полноценного экрана "Пользователи", который
+# должен честно показывать ВСЕХ пользователей с пагинацией. list_admins/
+# search_users выше не удалены (не мешают), но GET-эндпоинт теперь использует
+# функции ниже.
+#
+# "Текущий тариф" — ТА ЖЕ единственная точка правды, что и
+# get_active_subscription (оплачен И (бессрочен ИЛИ ещё не истёк)), просто
+# через LATERAL JOIN, чтобы не делать по отдельному запросу на каждого
+# пользователя списка. Условие вынесено в один SQL-фрагмент — если логика
+# "что считать активной подпиской" когда-нибудь изменится, её нужно поправить
+# только здесь и в get_active_subscription.
+_ACTIVE_PLAN_JOIN_SQL = """
+    LEFT JOIN LATERAL (
+        SELECT plan, expires_at FROM payments
+        WHERE payments.user_id = u.id AND payments.status = 'paid'
+          AND (payments.expires_at IS NULL OR payments.expires_at > NOW())
+        ORDER BY (payments.expires_at IS NULL) DESC, payments.expires_at DESC NULLS LAST, payments.paid_at DESC
+        LIMIT 1
+    ) ap ON TRUE
+    LEFT JOIN LATERAL (
+        SELECT title FROM plans WHERE plans.code = ap.plan ORDER BY plans.created_at DESC LIMIT 1
+    ) pl ON TRUE
+"""
+
+
+def list_users_with_plan(q: str = "", limit: int = 20, offset: int = 0):
+    """Все пользователи (не только admin/superadmin), с текущим активным
+    тарифом (если есть) — постранично, для экрана "Пользователи". С ?q=
+    фильтрует по email (частичное совпадение) или telegram_id (точное) —
+    тот же способ поиска, что и раньше в search_users()."""
+    where = ""
+    params: tuple = ()
+    if q:
+        where = "WHERE (u.email ILIKE ? OR CAST(u.telegram_id AS TEXT) = ?)"
+        params = (f"%{q}%", q)
+    return _fetch_all(
+        f"""
+        SELECT u.*, ap.plan AS active_plan_code, ap.expires_at AS active_plan_expires_at,
+               pl.title AS active_plan_title
+        FROM users u
+        {_ACTIVE_PLAN_JOIN_SQL}
+        {where}
+        ORDER BY u.id ASC
+        LIMIT ? OFFSET ?
+        """,
+        (*params, limit, offset),
+    )
+
+
+def count_users(q: str = "") -> int:
+    if q:
+        row = _fetch_one(
+            "SELECT COUNT(*) AS n FROM users WHERE email ILIKE ? OR CAST(telegram_id AS TEXT) = ?",
+            (f"%{q}%", q),
+        )
+    else:
+        row = _fetch_one("SELECT COUNT(*) AS n FROM users")
+    return row["n"] if row else 0
+
+
+def get_user_with_plan(user_id: int):
+    """Как get_user_by_id, но с теми же active_plan_* полями, что и
+    list_users_with_plan — используется, чтобы вернуть свежую строку сразу
+    после admin_set_user_plan() в одинаковой форме с остальным списком."""
+    return _fetch_one(
+        f"""
+        SELECT u.*, ap.plan AS active_plan_code, ap.expires_at AS active_plan_expires_at,
+               pl.title AS active_plan_title
+        FROM users u
+        {_ACTIVE_PLAN_JOIN_SQL}
+        WHERE u.id = ?
+        """,
+        (user_id,),
+    )
+
+
+def admin_set_user_plan(user_id: int, plan_code: str | None):
+    """Ручная выдача/смена/отзыв тарифа пользователю админом (только
+    superadmin, см. app/web/api/admin_users.py::set_user_plan). Пишет
+    отдельную запись в `payments` с provider='admin_grant' — так история
+    платежей честно показывает, что доступ выдан вручную, а не оплачен, а
+    не подделывает обычный платёж. expires_at считается от
+    plans.duration_days тем же способом, что и настоящая оплата (см.
+    mark_payment_paid) — NULL длительность тарифа = бессрочный доступ.
+
+    Перед выдачей нового тарифа (или просто при отзыве, plan_code=None)
+    сначала "гасится" текущая активная подписка пользователя (expires_at ->
+    NOW()) — существующие записи не удаляются и не помечаются
+    неоплаченными, только перестают считаться активными (см.
+    get_active_subscription). Без этого шага выдача НОВОГО тарифа поверх
+    ещё не истёкшего старого могла бы привести к тому, что
+    get_active_subscription по-прежнему честно выберет старую запись
+    (например, если она бессрочная или с более поздним expires_at), и
+    admin-панель показала бы не тот тариф, который админ только что выдал.
+    """
+    with tx() as conn:
+        conn.execute(
+            "UPDATE payments SET expires_at = NOW() WHERE user_id = ? AND status = 'paid' "
+            "AND (expires_at IS NULL OR expires_at > NOW())",
+            (user_id,),
+        )
+        if plan_code is None:
+            return
+        row = conn.execute(
+            "SELECT duration_days FROM plans WHERE code = ? ORDER BY created_at DESC LIMIT 1",
+            (plan_code,),
+        ).fetchone()
+        duration_days = row["duration_days"] if row else None
+        expires_sql = "NOW() + (? * INTERVAL '1 day')" if duration_days else "NULL"
+        extra_params = (duration_days,) if duration_days else ()
+        conn.execute(
+            "INSERT INTO payments (user_id, provider, plan, amount, currency, status, paid_at, expires_at) "
+            f"VALUES (?, 'admin_grant', ?, 0, 'USD', 'paid', NOW(), {expires_sql})",
+            (user_id, plan_code, *extra_params),
+        )
+
+
 def get_admin_dashboard_stats() -> dict:
     """Один аггрегатный запрос-набор для дэшборда админ-панели (см.
     app/web/api/admin_dashboard.py) — вместо того, чтобы фронтенд дёргал

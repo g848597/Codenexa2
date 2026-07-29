@@ -273,6 +273,7 @@ const dict = {
       `${Math.min(offset + 1, total)}–${Math.min(offset + limit, total)} из ${total}`,
     inv_audit_action_role_change: 'Смена роли',
     inv_audit_action_plan_price_change: 'Изменение цены тарифа',
+    inv_audit_action_plan_grant: 'Выдача/отзыв тарифа админом',
     // "create"/"update"/"delete"/"reorder"/"photo_upload"/"photo_delete" —
     // сейчас используются только для target_type="investor" (см.
     // app/web/api/investors.py), поэтому подписаны в контексте инвесторов;
@@ -415,6 +416,8 @@ const dict = {
     hub_no_email: 'Email не привязан',
     hub_via_telegram: 'Вход через Telegram',
     hub_edit_profile_btn: 'Управление аккаунтом',
+    hub_avatar_change_btn: 'Изменить фото профиля',
+    hub_avatar_upload_error: 'Не удалось загрузить фото. Попробуйте другой файл.',
 
     hub_section_ecosystem: 'CodeNexa Ecosystem',
     hub_section_subscription: 'Моя подписка',
@@ -584,8 +587,14 @@ const dict = {
       `Изменить роль пользователя «${name}» на «${roleLabel}»? Это влияет на доступ к админ-панели.`,
 
     ad_users_search_placeholder: 'Email или Telegram ID…',
-    ad_users_default_hint: 'Показаны текущие админы и суперадмины. Введите email или Telegram ID, чтобы найти любого пользователя.',
+    ad_users_default_hint: 'Показаны все пользователи системы. Введите email или Telegram ID, чтобы найти конкретного.',
     ad_users_empty: 'Никого не найдено',
+    ad_plan_none: 'Без тарифа',
+    ad_plan_until: (date) => `до ${date}`,
+    ad_users_prev_page: '← Назад',
+    ad_users_next_page: 'Вперёд →',
+    ad_users_page_of: (offset, limit, total) =>
+      `${Math.min(offset + 1, total)}–${Math.min(offset + limit, total)} из ${total}`,
 
     ad_plan_add_btn: 'Новый тариф',
     ad_plan_add_title: 'Новый тариф',
@@ -892,6 +901,7 @@ const dict = {
       `${Math.min(offset + 1, total)}–${Math.min(offset + limit, total)} of ${total}`,
     inv_audit_action_role_change: 'Role changed',
     inv_audit_action_plan_price_change: 'Plan price changed',
+    inv_audit_action_plan_grant: 'Plan granted/revoked by admin',
     inv_audit_action_create: 'Investor created',
     inv_audit_action_update: 'Investor updated',
     inv_audit_action_delete: 'Investor deleted',
@@ -1024,6 +1034,8 @@ const dict = {
     hub_no_email: 'No email linked',
     hub_via_telegram: 'Signed in via Telegram',
     hub_edit_profile_btn: 'Manage account',
+    hub_avatar_change_btn: 'Change profile photo',
+    hub_avatar_upload_error: 'Could not upload the photo. Try a different file.',
 
     hub_section_ecosystem: 'CodeNexa Ecosystem',
     hub_section_subscription: 'My Subscription',
@@ -1193,8 +1205,14 @@ const dict = {
       `Change ${name}'s role to "${roleLabel}"? This affects access to the admin panel.`,
 
     ad_users_search_placeholder: 'Email or Telegram ID…',
-    ad_users_default_hint: 'Showing current admins and superadmins. Enter an email or Telegram ID to find any user.',
+    ad_users_default_hint: 'Showing all users of the system. Enter an email or Telegram ID to find a specific one.',
     ad_users_empty: 'No one found',
+    ad_plan_none: 'No plan',
+    ad_plan_until: (date) => `until ${date}`,
+    ad_users_prev_page: '← Prev',
+    ad_users_next_page: 'Next →',
+    ad_users_page_of: (offset, limit, total) =>
+      `${Math.min(offset + 1, total)}–${Math.min(offset + limit, total)} of ${total}`,
 
     ad_plan_add_btn: 'New plan',
     ad_plan_add_title: 'New plan',

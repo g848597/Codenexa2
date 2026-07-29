@@ -285,6 +285,35 @@ function bind(screen) {
     const editBtn = root.querySelector('[data-hub-edit-profile]');
     if (editBtn) editBtn.addEventListener('click', () => { haptic('light'); push('security'); });
 
+    // Аватар профиля: камера-бейдж поверх круга открывает скрытый file input;
+    // при выборе файла — мгновенный локальный превью (optimistic UI) и
+    // загрузка на сервер (см. api/authApi.js::uploadAvatar, app/web/api/auth.py).
+    const avatarTrigger = root.querySelector('[data-hub-avatar-trigger]');
+    const avatarInput = root.querySelector('[data-hub-avatar-input]');
+    const avatarBox = root.querySelector('[data-hub-avatar]');
+    if (avatarTrigger && avatarInput && avatarBox) {
+      avatarTrigger.addEventListener('click', () => { haptic('light'); avatarInput.click(); });
+      avatarInput.addEventListener('change', async () => {
+        const file = avatarInput.files && avatarInput.files[0];
+        if (!file) return;
+        const prevHTML = avatarBox.innerHTML;
+        const localUrl = URL.createObjectURL(file);
+        avatarBox.innerHTML = `<img src="${localUrl}" alt="" />`; // optimistic — не ждём ответа сервера
+        try {
+          const { user: updated } = await authApi.uploadAvatar(file);
+          user = updated;
+          haptic('light');
+          render(); // подменяем локальный превью на реальный avatarUrl с сервера
+        } catch (e) {
+          avatarBox.innerHTML = prevHTML; // откатываем optimistic-превью
+          showAlert(e.message || t('hub_avatar_upload_error'));
+        } finally {
+          avatarInput.value = '';
+          URL.revokeObjectURL(localUrl);
+        }
+      });
+    }
+
     root.querySelector('[data-acc-logout]').addEventListener('click', async () => {
       try {
         await authApi.logout();

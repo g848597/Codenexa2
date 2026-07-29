@@ -50,10 +50,18 @@ export const adminApi = {
   dashboard: () => request('/api/admin/dashboard'),
 
   // --- Пользователи/роли (app/web/api/admin_users.py, уже существовал) ---
-  listUsers: (q = '') =>
-    request(`/api/admin/users${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  // Теперь постранично и со всеми пользователями по умолчанию (не только
+  // admin/superadmin) — см. app/web/api/admin_users.py::list_or_search_users.
+  listUsers: ({ q = '', limit = 20, offset = 0 } = {}) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (q) params.set('q', q);
+    return request(`/api/admin/users?${params.toString()}`);
+  },
   setUserRole: (userId, role) =>
     request(`/api/admin/users/${userId}/role`, { method: 'PUT', body: { role } }),
+  // planCode: null — отозвать текущий тариф (см. app/web/api/admin_users.py::set_user_plan).
+  setUserPlan: (userId, planCode) =>
+    request(`/api/admin/users/${userId}/plan`, { method: 'PUT', body: { planCode } }),
 
   // Полноценный экран "Журнал действий" — targetType добавлен вместе с этой
   // панелью (см. app/web/api/admin_users.py::get_audit_log).

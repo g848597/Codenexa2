@@ -28,7 +28,11 @@ export function hubHeaderHTML(user, hasPaid) {
   <div class="hub-header">
     <div class="hub-header-row">
       <div class="hub-avatar-ring">
-        <div class="hub-avatar">${user.avatarUrl ? `<img src="${esc(user.avatarUrl)}" alt="" />` : initials(user)}</div>
+        <div class="hub-avatar" data-hub-avatar>${user.avatarUrl ? `<img src="${esc(user.avatarUrl)}" alt="" />` : initials(user)}</div>
+        <button class="hub-avatar-camera-btn" data-hub-avatar-trigger type="button" aria-label="${t('hub_avatar_change_btn')}">
+          ${icon('camera', { size: 15 })}
+        </button>
+        <input class="hub-avatar-file-input" data-hub-avatar-input type="file" accept="image/jpeg,image/png,image/webp" hidden>
       </div>
       <div class="hub-id">
         <div class="hub-name">${esc(fullName)}</div>

@@ -69,6 +69,9 @@ const PATHS = {
   // Admin-панель (см. components/adminApp.js)
   gauge: '<circle cx="12" cy="13" r="8.2"/><path d="M12 13 15.5 8.8"/><path d="M8 5.2 9 6.6M16 5.2 15 6.6M4.5 13H6M18 13h1.5"/>',
   tag: '<path d="M11.5 3.5h5A2 2 0 0 1 18.5 5.5v5a2 2 0 0 1-.6 1.4l-7 7a2 2 0 0 1-2.8 0l-4.9-4.9a2 2 0 0 1 0-2.8l7-7a2 2 0 0 1 1.3-.6z" stroke-linejoin="round"/><circle cx="14.2" cy="8.8" r="1.1" fill="currentColor" stroke="none"/>',
+
+  // Аватар профиля HUB'а (см. components/profile/hubHeader.js)
+  camera: '<path d="M4 8.2A1.2 1.2 0 0 1 5.2 7h2.1l1-1.7A1.2 1.2 0 0 1 9.3 4.7h5.4a1.2 1.2 0 0 1 1 .6l1 1.7h2.1A1.2 1.2 0 0 1 20 8.2v10a1.2 1.2 0 0 1-1.2 1.2H5.2A1.2 1.2 0 0 1 4 18.2z" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.4"/>',
 };
 
 /**

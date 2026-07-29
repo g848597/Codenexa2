@@ -31,22 +31,37 @@ def _shape(row: dict) -> dict:
         "firstName": row.get("first_name"),
         "lastName": row.get("last_name"),
         "role": row.get("role") or "user",
+        # Текущий активный тариф пользователя (см. repo._ACTIVE_PLAN_JOIN_SQL
+        # — та же единственная точка правды, что и repo.get_active_subscription).
+        # None у всех трёх полей = у пользователя сейчас нет активной подписки
+        # — честно показываем "нет тарифа", а не выдумываем "free"/"basic".
+        "planCode": row.get("active_plan_code"),
+        "planTitle": row.get("active_plan_title"),
+        "planExpiresAt": row.get("active_plan_expires_at"),
     }
 
 
 @router.get("")
 def list_or_search_users(
     q: str = Query(default="", max_length=200),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     _admin: dict = Depends(get_current_superadmin),
 ):
-    """Без ?q= — текущие admin/superadmin (обзор "кому уже выдана роль").
-    С ?q= — поиск по email (частичное совпадение) или telegram_id (точное),
-    чтобы найти пользователя и выдать ему роль."""
-    if q.strip():
-        rows = repo.search_users(q.strip(), limit=20)
-    else:
-        rows = repo.list_admins()
-    return {"users": [_shape(r) for r in rows]}
+    """Все пользователи системы (не только admin/superadmin), постранично, с
+    текущим тарифом каждого (см. repo.list_users_with_plan). С ?q= — тот же
+    поиск по email (частичное совпадение) или telegram_id (точное), что и
+    раньше, просто теперь применяется к полному списку, а не только к
+    поиску "кому ещё не выдана роль"."""
+    q = q.strip()
+    rows = repo.list_users_with_plan(q, limit=limit, offset=offset)
+    total = repo.count_users(q)
+    return {
+        "users": [_shape(r) for r in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 class RoleBody(BaseModel):
@@ -99,6 +114,54 @@ def set_role(
         target_type="user",
         target_id=user_id,
         details={"from": previous_role, "to": payload.role, "targetEmail": target.get("email")},
+    )
+    return {"user": _shape(updated)}
+
+
+class PlanGrantBody(BaseModel):
+    # None = отозвать текущий активный тариф пользователя (см.
+    # repo.admin_set_user_plan). Пустая строка не разрешена намеренно —
+    # фронтенд обязан явно прислать null, а не "", чтобы отзыв не выглядел
+    # как забытое поле формы.
+    planCode: str | None = None
+
+
+@router.put("/{user_id}/plan")
+def set_user_plan(
+    user_id: int,
+    payload: PlanGrantBody,
+    request: Request,
+    admin: dict = Depends(get_current_superadmin),
+):
+    """Ручная выдача/смена/отзыв тарифа пользователю (только superadmin) —
+    пишет отдельную запись в payments с provider='admin_grant' (честная
+    история: видно, что доступ выдан админом, а не оплачен реально, см.
+    repo.admin_set_user_plan). expires_at берётся из plans.duration_days —
+    та же логика, что и у настоящей оплаты, а не выдуманное число дней."""
+    target = repo.get_user_by_id(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    if payload.planCode is not None:
+        plan = repo.get_active_plan(payload.planCode)
+        if not plan:
+            raise HTTPException(status_code=400, detail="Неизвестный или неактивный код тарифа")
+
+    previous = repo.get_active_subscription(user_id)
+    repo.admin_set_user_plan(user_id, payload.planCode)
+    updated = repo.get_user_with_plan(user_id)
+
+    log_action(
+        request,
+        admin,
+        action="plan_grant",
+        target_type="user",
+        target_id=user_id,
+        details={
+            "from": previous.get("plan") if previous else None,
+            "to": payload.planCode,
+            "targetEmail": target.get("email"),
+        },
     )
     return {"user": _shape(updated)}
 

@@ -35,9 +35,14 @@ export class AuthApiError extends Error {
 
 async function request(
   path,
-  { method = 'GET', body, useTelegram = false, extraHeaders = {} } = {}
+  { method = 'GET', body, useTelegram = false, extraHeaders = {}, isForm = false } = {}
 ) {
-  const headers = { 'Content-Type': 'application/json', ...extraHeaders };
+  // isForm — для загрузки файлов (см. avatar-эндпоинты ниже): тот же
+  // принцип, что и в investorsApi.js — при multipart НЕЛЬЗЯ самим
+  // выставлять Content-Type (иначе теряется boundary), браузер расставит
+  // его сам через fetch(..., { body: FormData }).
+  const headers = { ...extraHeaders };
+  if (!isForm && body !== undefined) headers['Content-Type'] = 'application/json';
   if (useTelegram) {
     const initData = getInitDataRaw();
     if (initData) headers['Authorization'] = `tma ${initData}`;
@@ -51,7 +56,7 @@ async function request(
     res = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: isForm ? body : body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
     throw new AuthApiError('Нет связи с сервером. Проверьте подключение.', 0);
@@ -98,6 +103,16 @@ export const authApi = {
     request('/api/auth/login', { method: 'POST', body: { email, password, totpCode } }),
   me: () => request('/api/auth/me'),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
+
+  // Аватар профиля (HUB, hubHeader.js) — та же multipart-загрузка, что и
+  // у фото инвесторов (investorsApi.js::uploadPhoto), просто self-service
+  // и без id (свой аватар, не чужая карточка), см. app/web/api/auth.py.
+  uploadAvatar: (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request('/api/auth/avatar', { method: 'POST', body: form, isForm: true });
+  },
+  removeAvatar: () => request('/api/auth/avatar', { method: 'DELETE' }),
 
   changePassword: (currentPassword, newPassword) =>
     request('/api/auth/change-password', {

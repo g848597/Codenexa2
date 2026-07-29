@@ -1,11 +1,14 @@
 import hmac
+import io
 import logging
+import os
 import secrets
 import time
+import uuid
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, EmailStr, field_validator
@@ -254,6 +257,83 @@ def dismiss_telegram_prompt(user: dict = Depends(get_current_user)):
     ни на этом, ни на следующих входах, пока Telegram так и не привязан."""
     user = repo.update_user(user["id"], telegram_prompt_dismissed=True)
     return {"user": _public_user(user)}
+
+
+# ---------- Аватар профиля (самостоятельная загрузка, HUB) ----------
+# Та же проверка/пересборка изображения, что и у фото инвесторов (см.
+# app/web/api/investors.py: реальная проверка содержимого файла через
+# Pillow — не только Content-Type, который клиент может подделать — плюс
+# пересохранение изображения (уничтожает EXIF/произвольный "хвост" файла) и
+# случайное серверное имя файла (клиентское имя никогда не попадает в путь
+# на диске). В отличие от investors.py это self-service — свой аватар
+# меняет сам пользователь (get_current_user, не get_current_admin), поэтому
+# без admin/аудит-лога — это не admin-действие.
+AVATAR_UPLOAD_DIR = os.path.join(settings.UPLOAD_DIR, "avatars")
+os.makedirs(AVATAR_UPLOAD_DIR, exist_ok=True)
+
+ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp"}
+AVATAR_MAX_DIMENSION = 640  # аватар — маленькая круглая картинка, крупнее не нужно
+
+
+def _remove_avatar_file(avatar_url: str | None):
+    # avatar_url бывает и внешним (фото профиля Google при OAuth-входе) —
+    # трогаем на диске только то, что сами туда положили.
+    if not avatar_url or not avatar_url.startswith("/uploads/avatars/"):
+        return
+    filename = os.path.basename(avatar_url)
+    path = os.path.join(AVATAR_UPLOAD_DIR, filename)
+    if os.path.isfile(path):
+        try:
+            os.remove(path)
+        except OSError:
+            pass  # не блокируем запрос из-за проблемы с уборкой мусора на диске
+
+
+@router.post("/avatar")
+async def upload_avatar(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    if file.content_type not in ALLOWED_AVATAR_TYPES:
+        raise HTTPException(status_code=400, detail="Разрешены только JPEG, PNG или WEBP")
+
+    raw = await file.read(settings.MAX_UPLOAD_BYTES + 1)
+    if len(raw) > settings.MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Файл слишком большой (максимум 5 МБ)")
+    if not raw:
+        raise HTTPException(status_code=400, detail="Пустой файл")
+
+    try:
+        from PIL import Image, ImageOps
+
+        with Image.open(io.BytesIO(raw)) as img:
+            img.verify()  # быстрая проверка, что это действительно изображение
+        with Image.open(io.BytesIO(raw)) as img:
+            img = ImageOps.exif_transpose(img)  # применяем ориентацию, затем EXIF отбрасываем
+            img = img.convert("RGB")
+            img.thumbnail((AVATAR_MAX_DIMENSION, AVATAR_MAX_DIMENSION))
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=88, optimize=True)
+            clean_bytes = buf.getvalue()
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="Файл повреждён или не является изображением")
+
+    _remove_avatar_file(user.get("avatar_url"))
+
+    filename = f"{uuid.uuid4().hex}.jpg"
+    dest_path = os.path.join(AVATAR_UPLOAD_DIR, filename)
+    with open(dest_path, "wb") as f:
+        f.write(clean_bytes)
+
+    avatar_url = f"/uploads/avatars/{filename}"
+    updated = repo.update_user(user["id"], avatar_url=avatar_url)
+    return {"user": _public_user(updated)}
+
+
+@router.delete("/avatar")
+def delete_avatar(user: dict = Depends(get_current_user)):
+    _remove_avatar_file(user.get("avatar_url"))
+    updated = repo.update_user(user["id"], avatar_url=None)
+    return {"user": _public_user(updated)}
 
 
 # ---------- Текущий пользователь ----------
