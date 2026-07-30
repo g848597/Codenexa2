@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.web import reminder_worker, telegram_setup
-from app.web.api import admin_dashboard, admin_plans, admin_users, auth, billing, docs, investors, organizations, referrals, sport_routes, telegram_webhook
+from app.web.api import admin_dashboard, admin_plans, admin_users, ai_director, auth, billing, docs, investors, organizations, referrals, sport_routes, telegram_webhook
 from app.web.config import settings
 from app.web.db import get_conn, init_db
 from app.web.middleware import SecurityHeadersMiddleware
@@ -63,6 +63,7 @@ app.include_router(telegram_webhook.router)
 app.include_router(sport_routes.router)
 app.include_router(organizations.router)
 app.include_router(docs.router)
+app.include_router(ai_director.router)
 
 
 @app.on_event("startup")

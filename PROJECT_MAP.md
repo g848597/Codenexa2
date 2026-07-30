@@ -66,6 +66,11 @@ app/web/            — бэкенд (FastAPI)
     organizations.py    — /api/organizations/* : командные (business-тариф) аккаунты, приглашения
     docs.py             — /api/templates/*, /api/documents/*, /api/profile/* : раздел "AI Docs"
     sport_routes.py     — /api/sport/* : раздел "AI Sport"
+    ai_director.py      — /api/ai-director : прокси к Anthropic Messages API для раздела
+                          "AI Business" (см. business-app/ ниже). Требует авторизации (Bearer),
+                          ключ ANTHROPIC_API_KEY только на сервере — фронтенд business-app/
+                          никогда не обращается к api.anthropic.com напрямую (см.
+                          business-app/src/services/aiDirectorClient.js).
     telegram_auth.py    — validate_init_data() — проверка подписи Telegram initData (не router, утилита)
     telegram_webhook.py — /telegram/webhook : вебхук САМОГО бота (pre_checkout_query, successful_payment, /start)
 
@@ -77,6 +82,34 @@ app/web/            — бэкенд (FastAPI)
     sport_common.py       — общая ошибка SportProviderError + TIER_RULES (тарифная лестница спорта)
     sport_provider.py     — оркестратор: пробует footballdata → clearsports по очереди
     predictions.py        — ЧЕСТНЫЙ прогноз матча (форма команд + фактор поля), НЕ фейковые проценты!
+
+business-app/        — раздел "AI Business" (CRM/проекты/финансы/AI Director), ОТДЕЛЬНОЕ
+  React + Vite SPA — не вписан в архитектуру webapp/ (ванильный JS без сборщика),
+  поэтому живёт как независимый проект и раздаётся уже собранной статикой.
+  Сборка: Dockerfile, стадия business-app-build (npm ci && npm run build), результат
+  копируется в webapp/business-app/ — оттуда его отдаёт тот же
+  StaticFiles(WEBAPP_DIR) из server.py, без отдельного хостинга/поддомена.
+  Открывается из webapp/ карточкой "AI Business" (config/products.js, id
+  "business") через components/businessApp.js — тот монтирует iframe на
+  /business-app/ (см. комментарий в начале файла — почему iframe, а не
+  переписывание на vanilla JS).
+  vite.config.js         — base: '/business-app/' (обязательно для сборки под подпуть)
+  src/App.jsx             — корневой компонент, своя навигация (tab/subScreen)
+  src/storage/            — ВАЖНО: изначально держится на window.storage (Claude.ai
+                            artifacts API) — вне Claude.ai безопасно "проваливается" в
+                            демо-данные без сохранения между перезапусками (см.
+                            business-app/README.md, раздел "Важно про хранилище").
+                            Перед реальным запуском для пользователей заменить
+                            storage/storageClient.js на вызовы настоящего backend/БД.
+  src/features/ai/AIDirector.jsx, src/services/aiDirectorClient.js
+                          — чат с Anthropic через тот же бэкенд, что и остальной
+                            CodeNexa: см. app/web/api/ai_director.py выше. Токен сессии
+                            читается из localStorage (ключ codenexa_auth_token_v1,
+                            тот же, что webapp/src/api/authApi.js) — общий origin,
+                            повторный логин внутри business-app не нужен.
+  server/                — справочная Node/Express-реализация прокси к Anthropic
+                            (использовалась как основа для app/web/api/ai_director.py,
+                            сама по себе не разворачивается в этом деплое).
 
 webapp/              — фронтенд (ванильный JS, ES-модули, без сборщика)
   index.html            — единственная HTML-страница, все "экраны" — <section class="view">, переключение через .active
@@ -91,6 +124,11 @@ webapp/              — фронтенд (ванильный JS, ES-модул�
     profile/*.js           — каждый файл = один экран внутри Личного кабинета (см. таблицу ниже)
     docsApp.js             — раздел "AI Docs" (полноэкранный, свой стек экранов)
     sportApp.js            — раздел "AI Sport" (полноэкранный, свой стек экранов)
+    businessApp.js         — раздел "AI Business" (полноэкранный) — в отличие от
+                              docsApp/sportApp НЕ рендерит контент сам, а монтирует
+                              iframe на /business-app/ (см. business-app/ выше — это
+                              отдельное React/Vite-приложение, не вписывается в
+                              архитектуру "vanilla JS без сборщика" остального webapp/)
     adminApp.js             — Admin-панель (полноэкранная, свой стек экранов) — см. раздел
                               "Admin-панель" ниже. Открывается ТОЛЬКО из пункта меню в
                               accountApp.js (через явный onClose-колбэк, не через navigation.js

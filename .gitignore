@@ -1,6 +1,6 @@
 .env
 .dev_jwt_secret
-data/
+/data/
 __pycache__/
 *.pyc
 .venv/

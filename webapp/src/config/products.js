@@ -63,6 +63,25 @@ export const PRODUCTS = [
     },
   },
   {
+    id: 'business',
+    name: 'AI Business',
+    tagline: { ru: 'CRM, проекты, финансы и AI Director в одном месте', en: 'CRM, projects, finance and AI Director in one place' },
+    model: { label: { ru: 'Подписка', en: 'Subscription' }, cls: 'model-subscription' },
+    stage: 'traction',
+    webAppEntry: true, // есть рабочее веб-приложение — см. src/components/businessApp.js
+    metric: {
+      label: { ru: 'Активные компании', en: 'Active companies' },
+      source: { ru: 'Источник: аналитика приложения', en: 'Source: app analytics' },
+      value: null,
+      unit: '',
+    },
+    investor: {
+      role: { ru: 'B2B-продукт: превращает разовых пользователей в платящие команды', en: 'A B2B product turning one-off users into paying teams' },
+      economics: { ru: 'Многоуровневая подписка (Free/Pro/Business/Enterprise) по числу менеджеров', en: 'Tiered subscription (Free/Pro/Business/Enterprise) priced by number of managers' },
+      risk: { ru: 'Более длинный цикл продажи, чем у остальных продуктов линейки', en: 'A longer sales cycle than the rest of the product lineup' },
+    },
+  },
+  {
     id: 'automation',
     name: 'Automation Hub',
     tagline: { ru: 'Автоматизация рутинных сценариев', en: 'Automating routine workflows' },

@@ -1,0 +1,15 @@
+{
+  "name": "CodeNexa Business",
+  "short_name": "CodeNexa",
+  "description": "CRM, проекты, финансы и AI Director — мобильный бизнес-OS.",
+  "start_url": "/business-app/",
+  "scope": "/business-app/",
+  "display": "standalone",
+  "background_color": "#08090B",
+  "theme_color": "#08090B",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/business-app/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/business-app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

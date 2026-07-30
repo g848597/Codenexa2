@@ -15,6 +15,7 @@ import { icon } from '../../utils/icons.js';
 const PRODUCT_ICON = {
   sport: 'stadium',
   docs: 'fileText',
+  business: 'briefcase',
   automation: 'zap',
   premium: 'crown',
 };

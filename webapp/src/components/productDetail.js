@@ -3,6 +3,7 @@ import { PRODUCT_DETAILS } from '../config/productDetails.js';
 import { investorPanelHTML, wireInvestorToggles } from './investorPanel.js';
 import { openDocsApp } from './docsApp.js';
 import { openSportApp } from './sportApp.js';
+import { openBusinessApp } from './businessApp.js';
 import { haptic } from '../telegram.js';
 import { t, tl } from '../i18n.js';
 import { icon } from '../utils/icons.js';
@@ -14,6 +15,7 @@ import { registerProductReopener, setCurrentProductId } from '../navigation.js';
 const WEB_APP_LAUNCHERS = {
   docs: openDocsApp,
   sport: openSportApp,
+  business: openBusinessApp,
 };
 
 function statusLabel(status) {

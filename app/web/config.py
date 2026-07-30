@@ -155,6 +155,14 @@ class Settings:
     JWT_SECRET = _resolve_jwt_secret()
     JWT_TTL_DAYS = int(os.getenv("JWT_TTL_DAYS", "30"))
 
+    # AI Business / AI Director (см. app/web/api/ai_director.py,
+    # business-app/src/features/ai/AIDirector.jsx). Без ключа эндпоинт
+    # честно отвечает "не настроено" (см. ai_director.py), а не выдуманным
+    # ответом — то же правило №1, что и у AI Sport без FOOTBALLDATA_API_KEY.
+    ANTHROPIC_API_KEY = _clean_env("ANTHROPIC_API_KEY")
+    ANTHROPIC_MODEL = _clean_env("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+
+
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
     GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")

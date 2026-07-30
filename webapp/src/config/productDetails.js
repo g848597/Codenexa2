@@ -39,6 +39,16 @@ export const PRODUCT_DETAILS = {
     techProgress: null,
     liveDataSlot: false,
   },
+  business: {
+    steps: [
+      { title: { ru: 'Подключаешь компанию', en: 'Connect your company' }, desc: { ru: 'Открываешь AI Business внутри CodeNexa — без отдельной регистрации.', en: 'Open AI Business inside CodeNexa — no separate sign-up needed.' } },
+      { title: { ru: 'Ведёшь CRM, проекты и финансы', en: 'Run CRM, projects and finance' }, desc: { ru: 'Клиенты, сделки, задачи команды и деньги — в одном приложении.', en: 'Clients, deals, team tasks and money — all in one app.' } },
+      { title: { ru: 'Спрашиваешь AI Director', en: 'Ask the AI Director' }, desc: { ru: 'Получаешь сводку и рекомендации по бизнесу, если тариф это открывает.', en: 'Get a business summary and recommendations, if your plan unlocks it.' } },
+    ],
+    changelog: [],
+    techProgress: null, // не validation-стадия — этот блок не показывается
+    liveDataSlot: false,
+  },
   automation: {
     steps: [
       { title: { ru: 'Описываешь сценарий', en: 'Describe the workflow' }, desc: { ru: 'Какой процесс нужно автоматизировать и с чем он должен интегрироваться.', en: 'What process needs automating and what it needs to integrate with.' } },
