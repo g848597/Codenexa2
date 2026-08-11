@@ -1,0 +1,12 @@
+{
+  "name": "snezhana-landing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Snezhana Utesheva booking landing page (Supabase backend)",
+  "scripts": {
+    "start": "serve -s . -l $PORT"
+  },
+  "dependencies": {
+    "serve": "^14.2.3"
+  }
+}
