@@ -969,7 +969,15 @@ const Booking = {
     document.getElementById('booking-overlay').classList.add('open');
     document.body.style.overflow='hidden';
     this.step=1; this.date=null; this.time=null; this.calDate=new Date();
-    const services = await DB.get('services');
+    let services;
+    try{
+      services = await DB.get('services');
+    }catch(e){
+      console.error('Booking.open: DB.get(services) failed:', e);
+      toast(dbErrorMessage(e));
+      this.close();
+      return;
+    }
     if(serviceId){
       this.service = services.find(s=>s.id===serviceId);
       this.step=2;
@@ -1557,11 +1565,22 @@ supabase.auth.onAuthStateChange((event)=>{
   }
 });
 
+function dbErrorMessage(e){
+  const msg = (e && e.message) || '';
+  if(msg.includes('relation') || msg.includes('does not exist') || msg.includes('42P01')){
+    return 'База данных ещё не настроена (не выполнена SQL-миграция в Supabase).';
+  }
+  if(msg.includes('Invalid API key') || msg.includes('JWT') || msg.includes('401')){
+    return 'Неверный ключ Supabase (SUPABASE_ANON_KEY) — проверьте настройки.';
+  }
+  return 'Не удалось загрузить данные с сервера. Проверьте подключение к Supabase.';
+}
+
 document.addEventListener('DOMContentLoaded', ()=>{
-  renderSettings();
-  renderServices();
+  renderSettings().catch(e=>{ console.error('renderSettings failed:', e); });
+  renderServices().catch(e=>{ console.error('renderServices failed:', e); toast(dbErrorMessage(e)); });
   renderPortfolio();
-  renderReviews();
+  renderReviews().catch(e=>{ console.error('renderReviews failed:', e); });
   renderFaq();
   initReveal();
   route();
