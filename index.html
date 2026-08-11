@@ -823,6 +823,41 @@ function toast(msg){
   t.textContent=msg; t.classList.add('show');
   clearTimeout(toast._tm); toast._tm=setTimeout(()=>t.classList.remove('show'),2400);
 }
+
+/* =========================================================================
+   ВРЕМЕННАЯ ПАНЕЛЬ ОТЛАДКИ (для диагностики с телефона, без F12)
+   Показывает на экране последние ошибки. Убрать после того, как всё
+   заработает — просто удалить этот блок и вызовы debugLog(...).
+   ========================================================================= */
+function debugLog(msg){
+  try{
+    let panel = document.getElementById('debug-panel');
+    if(!panel){
+      panel = document.createElement('div');
+      panel.id = 'debug-panel';
+      panel.style.cssText = 'position:fixed; left:8px; right:8px; bottom:8px; max-height:40vh; overflow:auto; background:#000; color:#0f0; font:11px/1.4 monospace; padding:10px; border-radius:8px; z-index:99999; white-space:pre-wrap; word-break:break-all; box-shadow:0 0 0 2px #333;';
+      const closeBtn = document.createElement('div');
+      closeBtn.textContent = '✕ закрыть отладку';
+      closeBtn.style.cssText = 'color:#f66; text-align:right; cursor:pointer; margin-bottom:6px;';
+      closeBtn.onclick = ()=>panel.remove();
+      panel.appendChild(closeBtn);
+      document.body.appendChild(panel);
+    }
+    const line = document.createElement('div');
+    line.style.borderTop = '1px solid #333';
+    line.style.paddingTop = '4px';
+    line.style.marginTop = '4px';
+    line.textContent = '['+new Date().toLocaleTimeString()+'] '+msg;
+    panel.appendChild(line);
+    panel.scrollTop = panel.scrollHeight;
+  }catch(e){ /* если даже это упало — молчим */ }
+}
+window.addEventListener('error', (e)=>{
+  debugLog('ГЛОБАЛЬНАЯ ОШИБКА: '+e.message+' ('+e.filename+':'+e.lineno+')');
+});
+window.addEventListener('unhandledrejection', (e)=>{
+  debugLog('НЕОБРАБОТАННЫЙ ПРОМИС: '+(e.reason && e.reason.message ? e.reason.message : JSON.stringify(e.reason)));
+});
 function fmtMoney(n){ return n.toLocaleString('ru-RU')+' ₸'; }
 function pad(n){ return n<10?'0'+n:''+n; }
 function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
@@ -958,10 +993,12 @@ async function openWhatsApp(){
 
 function toggleMobileMenu(open){
   try{
+    debugLog('toggleMobileMenu('+open+') нажато');
     const el = document.getElementById('mobile-menu');
-    if(!el){ console.error('toggleMobileMenu: элемент #mobile-menu не найден в DOM'); return; }
+    if(!el){ debugLog('ОШИБКА: элемент #mobile-menu не найден в DOM'); return; }
     el.classList.toggle('open', open);
-  }catch(e){ console.error('toggleMobileMenu failed:', e); }
+    debugLog('mobile-menu теперь: '+(el.classList.contains('open') ? 'открыто' : 'закрыто'));
+  }catch(e){ debugLog('toggleMobileMenu упал: '+e.message); }
 }
 
 /* scroll reveal */
@@ -979,18 +1016,19 @@ function initReveal(){
 const Booking = {
   step:1, service:null, date:null, time:null, calDate:new Date(),
   async open(serviceId){
-    console.log('Booking.open вызван, serviceId:', serviceId);
+    debugLog('Кнопка "Записаться" нажата, serviceId='+serviceId);
     const overlay = document.getElementById('booking-overlay');
-    if(!overlay){ console.error('Booking.open: элемент #booking-overlay не найден в DOM'); return; }
+    if(!overlay){ debugLog('ОШИБКА: элемент #booking-overlay не найден в DOM'); return; }
     overlay.classList.add('open');
     document.body.style.overflow='hidden';
     this.step=1; this.date=null; this.time=null; this.calDate=new Date();
     let services;
     try{
+      debugLog('Запрашиваю таблицу services из Supabase...');
       services = await DB.get('services');
-      console.log('Booking.open: услуги загружены из Supabase:', services && services.length);
+      debugLog('Успех: получено услуг — '+(services ? services.length : 0));
     }catch(e){
-      console.error('Booking.open: DB.get(services) failed — проверьте SUPABASE_URL/ANON_KEY и миграции:', e);
+      debugLog('ОШИБКА Supabase (DB.get services): '+(e && e.message ? e.message : JSON.stringify(e)));
       toast(dbErrorMessage(e));
       this.close();
       return;
