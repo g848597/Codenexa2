@@ -274,10 +274,10 @@ insert into reviews (name, text, rating, visible) values
 
 insert into settings (key, value) values
 ('master_name','Снежана Утешева'),
-('phone','+7 707 123 45 67'),
-('whatsapp','77071234567'),
-('instagram','@snezhana.brows'),
-('address','г. Усть-Каменогорск, ул. Пушкина, 12'),
+('phone','+7 708 127 6005'),
+('whatsapp','77081276005'),
+('instagram','@snezhana.utesheva'),
+('address','с. Новоишимское'),
 ('telegram_chat_id','');   -- заполнить из админки после подключения Telegram-бота (см. README)
 
 -- -------------------------------------------------------------------------
