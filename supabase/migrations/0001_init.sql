@@ -154,7 +154,7 @@ begin
     auth.uid(),
     TG_OP,
     TG_TABLE_NAME,
-    coalesce((case when TG_OP = 'DELETE' then OLD.id else NEW.id end)::text, null),
+    to_jsonb(case when TG_OP = 'DELETE' then OLD else NEW end)->>'id',
     case
       when TG_OP = 'DELETE' then to_jsonb(OLD)
       when TG_OP = 'UPDATE' then jsonb_build_object('before', to_jsonb(OLD), 'after', to_jsonb(NEW))
