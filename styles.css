@@ -374,3 +374,6 @@ table.admin-table td{padding:12px 8px; border-bottom:1px solid #f0ebe3; vertical
   .why-grid{grid-template-columns:1fr;}
   .portfolio-grid{grid-template-columns:1fr 1fr;}
 }
+
+/* Image fallback */
+.portfolio-item.image-error::after{content:'Фото временно недоступно';display:flex;align-items:center;justify-content:center;height:100%;color:#8a8078;font-size:12px;background:var(--secondary);}

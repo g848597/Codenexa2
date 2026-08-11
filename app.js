@@ -9,6 +9,38 @@ const SUPABASE_URL = 'https://temjwwglowbuarxuixpa.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_6kcF4N5DLCpLMSoaPDNmgQ_LHFDFZUq';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/* Надёжный fallback: лендинг не должен ломаться, если Supabase временно недоступен. */
+const FALLBACK_SERVICES = [
+  {id:'fallback-lash-lamination', category:'Ресницы', name:'Ламинирование ресниц', description:'Подчёркивает природную красоту, делает взгляд выразительнее и ухоженнее.', price:8500, duration:60, image:'https://images.unsplash.com/photo-1583001931096-959e9a1a6223?q=80&w=1000&auto=format&fit=crop', active:true},
+  {id:'fallback-brow-correction', category:'Брови', name:'Коррекция формы', description:'Подбор идеальной формы с учётом особенностей лица.', price:3000, duration:30, image:'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?q=80&w=1000&auto=format&fit=crop', active:true},
+  {id:'fallback-brow-color', category:'Брови', name:'Окрашивание + коррекция', description:'Насыщенный цвет и идеальная форма для выразительного взгляда.', price:6000, duration:45, image:'https://images.unsplash.com/photo-1512207736890-6ffe237ff9c8?q=80&w=1000&auto=format&fit=crop', active:true},
+  {id:'fallback-complex', category:'Комплекс', name:'Ламинирование + коррекция', description:'Комплекс для естественного объёма и идеальной формы.', price:7000, duration:75, image:'https://images.unsplash.com/photo-1560750588-73207b1ef5b8?q=80&w=1000&auto=format&fit=crop', active:true},
+  {id:'fallback-complex-full', category:'Комплекс', name:'Ламинирование + окрашивание + коррекция', description:'Максимальный эффект для идеального взгляда каждый день.', price:8000, duration:90, image:'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?q=80&w=1000&auto=format&fit=crop', active:true},
+  {id:'fallback-waxing', category:'Дополнительно', name:'Ваксинг', description:'Бережное удаление лишних волосков для гладкой кожи.', price:500, duration:15, image:'https://images.unsplash.com/photo-1596704017254-9b121068fb31?q=80&w=1000&auto=format&fit=crop', active:true}
+];
+const FALLBACK_WORKING_HOURS = [
+  {day:1,label:'Понедельник',start:'09:00',end:'19:00',is_working:true},
+  {day:2,label:'Вторник',start:'09:00',end:'19:00',is_working:true},
+  {day:3,label:'Среда',start:'09:00',end:'19:00',is_working:true},
+  {day:4,label:'Четверг',start:'09:00',end:'19:00',is_working:true},
+  {day:5,label:'Пятница',start:'09:00',end:'19:00',is_working:true},
+  {day:6,label:'Суббота',start:'10:00',end:'16:00',is_working:true},
+  {day:0,label:'Воскресенье',start:'',end:'',is_working:false}
+];
+function imageFallback(img, fallback){
+  if(img && fallback && img.dataset.fallbackApplied) return;
+  if(img) img.dataset.fallbackApplied='1';
+  if(img && fallback) img.src=fallback;
+}
+function setMainPhotos(services){
+  const photos=(services||[]).map(s=>s.image).filter(Boolean);
+  if(!photos.length) return;
+  const hero=document.querySelector('.hero-media img');
+  const about=document.querySelector('.about-media img');
+  if(hero){ hero.src=photos[0]; hero.onerror=()=>imageFallback(hero, photos[1]||photos[0]); }
+  if(about){ about.src=photos[1]||photos[0]; about.onerror=()=>imageFallback(about, photos[0]); }
+}
+
 /* =========================================================================
    DATA LAYER
    Тот же набор методов DB.*, что был в demo-версии на localStorage,
@@ -80,8 +112,14 @@ async function fetchAvailableSlots(dateStr, serviceId){
   const { data, error } = await supabase.functions.invoke('get-available-slots', {
     body: { date: dateStr, service_id: serviceId }
   });
-  if(error){ console.error('get-available-slots', error); return []; }
-  if(data && data.error){ console.error('get-available-slots:', data.error); return []; }
+  if(error){
+    console.error('get-available-slots', error);
+    throw new Error('BOOKING_FUNCTION_UNAVAILABLE');
+  }
+  if(data && data.error){
+    console.error('get-available-slots:', data.error);
+    throw new Error(data.error);
+  }
   return (data && data.slots) || [];
 }
 
@@ -164,22 +202,35 @@ async function findNearestAvailableDate(fromDateStr, durationMin, serviceId){
    RENDER: LANDING PAGE SECTIONS
    ========================================================================= */
 async function renderSettings(){
-  const s = await DB.getSettings();
-  document.getElementById('c-phone').textContent = s.phone;
-  document.getElementById('c-wa').textContent = '+'+s.whatsapp;
-  document.getElementById('c-inst').textContent = s.instagram;
-  document.getElementById('c-addr').textContent = s.address;
-  document.getElementById('c-inst-link').href = 'https://instagram.com/'+s.instagram.replace('@','');
-  document.getElementById('c-tel-link').href = 'tel:'+s.phone.replace(/[^\d+]/g,'');
-  document.getElementById('f-phone').textContent = s.phone;
-  document.getElementById('f-inst').textContent = s.instagram;
-  document.getElementById('f-addr').textContent = s.address;
+  let s;
+  try { s = await DB.getSettings(); }
+  catch(e) {
+    s = {phone:'+7 708 127 6005', whatsapp:'77081276005', instagram:'@snezhana.utesheva', address:'с. Новоишимское'};
+    console.warn('Supabase settings недоступны, использую fallback', e);
+  }
+  document.getElementById('c-phone').textContent = s.phone || '';
+  document.getElementById('c-wa').textContent = s.whatsapp ? '+'+s.whatsapp : '';
+  document.getElementById('c-inst').textContent = s.instagram || '';
+  document.getElementById('c-addr').textContent = s.address || '';
+  document.getElementById('c-inst-link').href = 'https://instagram.com/'+String(s.instagram||'').replace('@','');
+  document.getElementById('c-tel-link').href = 'tel:'+String(s.phone||'').replace(/[^\d+]/g,'');
+  document.getElementById('f-phone').textContent = s.phone || '';
+  document.getElementById('f-inst').textContent = s.instagram || '';
+  document.getElementById('f-addr').textContent = s.address || '';
 }
 
 let currentServiceFilter='Все';
 async function renderServices(){
-  const all = await DB.get('services');
-  const services = all.filter(s=>s.active);
+  let all;
+  try { all = await DB.get('services'); }
+  catch(e) {
+    console.warn('Supabase services недоступны, использую fallback', e);
+    all = FALLBACK_SERVICES;
+  }
+  const services = (all || []).filter(s=>s.active);
+  setMainPhotos(services);
+  const dbPhotos = services.filter(s=>s.image).map(s=>({cat:s.category, img:s.image, title:s.name}));
+  if(dbPhotos.length) { PORTFOLIO_ITEMS = dbPhotos; renderPortfolio(); }
   const cats = ['Все', ...new Set(services.map(s=>s.category))];
   document.getElementById('services-tabs').innerHTML = cats.map(c=>
     `<button class="tab-btn ${c===currentServiceFilter?'active':''}" onclick="setServiceFilter('${c}')">${c}</button>`).join('');
@@ -198,16 +249,7 @@ async function renderServices(){
 }
 function setServiceFilter(c){ currentServiceFilter=c; renderServices(); }
 
-const PORTFOLIO_ITEMS = [
-  {cat:'Брови', img:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNTAwIj4KPHJlY3Qgd2lkdGg9IjUwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNGNUYwRTgiLz4KPGNpcmNsZSBjeD0iMjUwLjAiIGN5PSIyNTAuMCIgcj0iMjMwLjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzhBNUE0OCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjI1Ii8+CjxwYXRoIGQ9Ik0gMTEwLjAgMjEwLjAgUSAyNTAuMCAxNTUuMCAzOTAuMCAyMTAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPHBhdGggZD0iTSAxMzAuMCAyNzAuMCBRIDI1MC4wIDIyMC4wIDM3MC4wIDI3MC4wIiBmaWxsPSJub25lIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxwYXRoIGQ9Ik0gMTMwLjAgMjcwLjAgUSAyNTAuMCAzMDUuMCAzNzAuMCAyNzAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOEE1QTQ4IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC43Ii8+CjxjaXJjbGUgY3g9IjI1MC4wIiBjeT0iMjcyLjAiIHI9IjI2IiBmaWxsPSIjMkIyMTFCIi8+CjxjaXJjbGUgY3g9IjI0Mi4wIiBjeT0iMjYyLjAiIHI9IjciIGZpbGw9IiNGRkZERjkiIG9wYWNpdHk9IjAuODUiLz4KPGxpbmUgeDE9IjEzNS4wIiB5MT0iMjY4LjAiIHgyPSIxMzEuMCIgeTI9IjI1MC4wIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMTYzLjgiIHkxPSIyNDguMyIgeDI9IjE1OS44IiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxOTIuNSIgeTE9IjIzNC4yIiB4Mj0iMTg4LjUiIHkyPSIyMTYuMiIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjIyMS4yIiB5MT0iMjI1LjgiIHgyPSIyMTcuMiIgeTI9IjIwNy44IiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMjUwLjAiIHkxPSIyMjMuMCIgeDI9IjI0Ni4wIiB5Mj0iMjA1LjAiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIyNzguOCIgeTE9IjIyNS44IiB4Mj0iMjc0LjgiIHkyPSIyMDcuOCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjMwNy41IiB5MT0iMjM0LjIiIHgyPSIzMDMuNSIgeTI9IjIxNi4yIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMzM2LjIiIHkxPSIyNDguMyIgeDI9IjMzMi4yIiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIzNjUuMCIgeTE9IjI2OC4wIiB4Mj0iMzYxLjAiIHkyPSIyNTAuMCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjwvc3ZnPg=='},
-  {cat:'Ресницы', img:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNTAwIj4KPHJlY3Qgd2lkdGg9IjUwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNFOERFRDAiLz4KPGNpcmNsZSBjeD0iMjUwLjAiIGN5PSIyNTAuMCIgcj0iMjMwLjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzhBNUE0OCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjI1Ii8+CjxwYXRoIGQ9Ik0gMTEwLjAgMjEwLjAgUSAyNTAuMCAxNTUuMCAzOTAuMCAyMTAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPHBhdGggZD0iTSAxMzAuMCAyNzAuMCBRIDI1MC4wIDIyMC4wIDM3MC4wIDI3MC4wIiBmaWxsPSJub25lIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxwYXRoIGQ9Ik0gMTMwLjAgMjcwLjAgUSAyNTAuMCAzMDUuMCAzNzAuMCAyNzAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOEE1QTQ4IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC43Ii8+CjxjaXJjbGUgY3g9IjI1MC4wIiBjeT0iMjcyLjAiIHI9IjI2IiBmaWxsPSIjMkIyMTFCIi8+CjxjaXJjbGUgY3g9IjI0Mi4wIiBjeT0iMjYyLjAiIHI9IjciIGZpbGw9IiNGRkZERjkiIG9wYWNpdHk9IjAuODUiLz4KPGxpbmUgeDE9IjEzNS4wIiB5MT0iMjY4LjAiIHgyPSIxMzEuMCIgeTI9IjI1MC4wIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMTYzLjgiIHkxPSIyNDguMyIgeDI9IjE1OS44IiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxOTIuNSIgeTE9IjIzNC4yIiB4Mj0iMTg4LjUiIHkyPSIyMTYuMiIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjIyMS4yIiB5MT0iMjI1LjgiIHgyPSIyMTcuMiIgeTI9IjIwNy44IiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMjUwLjAiIHkxPSIyMjMuMCIgeDI9IjI0Ni4wIiB5Mj0iMjA1LjAiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIyNzguOCIgeTE9IjIyNS44IiB4Mj0iMjc0LjgiIHkyPSIyMDcuOCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjMwNy41IiB5MT0iMjM0LjIiIHgyPSIzMDMuNSIgeTI9IjIxNi4yIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMzM2LjIiIHkxPSIyNDguMyIgeDI9IjMzMi4yIiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIzNjUuMCIgeTE9IjI2OC4wIiB4Mj0iMzYxLjAiIHkyPSIyNTAuMCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjwvc3ZnPg=='},
-  {cat:'Комплекс', img:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNTAwIj4KPHJlY3Qgd2lkdGg9IjUwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNGNUYwRTgiLz4KPGNpcmNsZSBjeD0iMjUwLjAiIGN5PSIyNTAuMCIgcj0iMjMwLjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzhBNUE0OCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjI1Ii8+CjxwYXRoIGQ9Ik0gMTEwLjAgMjEwLjAgUSAyNTAuMCAxNTUuMCAzOTAuMCAyMTAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPHBhdGggZD0iTSAxMzAuMCAyNzAuMCBRIDI1MC4wIDIyMC4wIDM3MC4wIDI3MC4wIiBmaWxsPSJub25lIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxwYXRoIGQ9Ik0gMTMwLjAgMjcwLjAgUSAyNTAuMCAzMDUuMCAzNzAuMCAyNzAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOEE1QTQ4IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC43Ii8+CjxjaXJjbGUgY3g9IjI1MC4wIiBjeT0iMjcyLjAiIHI9IjI2IiBmaWxsPSIjMkIyMTFCIi8+CjxjaXJjbGUgY3g9IjI0Mi4wIiBjeT0iMjYyLjAiIHI9IjciIGZpbGw9IiNGRkZERjkiIG9wYWNpdHk9IjAuODUiLz4KPGxpbmUgeDE9IjEzNS4wIiB5MT0iMjY4LjAiIHgyPSIxMzEuMCIgeTI9IjI1MC4wIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMTYzLjgiIHkxPSIyNDguMyIgeDI9IjE1OS44IiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxOTIuNSIgeTE9IjIzNC4yIiB4Mj0iMTg4LjUiIHkyPSIyMTYuMiIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjIyMS4yIiB5MT0iMjI1LjgiIHgyPSIyMTcuMiIgeTI9IjIwNy44IiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMjUwLjAiIHkxPSIyMjMuMCIgeDI9IjI0Ni4wIiB5Mj0iMjA1LjAiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIyNzguOCIgeTE9IjIyNS44IiB4Mj0iMjc0LjgiIHkyPSIyMDcuOCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjMwNy41IiB5MT0iMjM0LjIiIHgyPSIzMDMuNSIgeTI9IjIxNi4yIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMzM2LjIiIHkxPSIyNDguMyIgeDI9IjMzMi4yIiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIzNjUuMCIgeTE9IjI2OC4wIiB4Mj0iMzYxLjAiIHkyPSIyNTAuMCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjwvc3ZnPg=='},
-  {cat:'Брови', img:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNTAwIj4KPHJlY3Qgd2lkdGg9IjUwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNFOERFRDAiLz4KPGNpcmNsZSBjeD0iMjUwLjAiIGN5PSIyNTAuMCIgcj0iMjMwLjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzhBNUE0OCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjI1Ii8+CjxwYXRoIGQ9Ik0gMTEwLjAgMjEwLjAgUSAyNTAuMCAxNTUuMCAzOTAuMCAyMTAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPHBhdGggZD0iTSAxMzAuMCAyNzAuMCBRIDI1MC4wIDIyMC4wIDM3MC4wIDI3MC4wIiBmaWxsPSJub25lIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxwYXRoIGQ9Ik0gMTMwLjAgMjcwLjAgUSAyNTAuMCAzMDUuMCAzNzAuMCAyNzAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOEE1QTQ4IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC43Ii8+CjxjaXJjbGUgY3g9IjI1MC4wIiBjeT0iMjcyLjAiIHI9IjI2IiBmaWxsPSIjMkIyMTFCIi8+CjxjaXJjbGUgY3g9IjI0Mi4wIiBjeT0iMjYyLjAiIHI9IjciIGZpbGw9IiNGRkZERjkiIG9wYWNpdHk9IjAuODUiLz4KPGxpbmUgeDE9IjEzNS4wIiB5MT0iMjY4LjAiIHgyPSIxMzEuMCIgeTI9IjI1MC4wIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMTYzLjgiIHkxPSIyNDguMyIgeDI9IjE1OS44IiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxOTIuNSIgeTE9IjIzNC4yIiB4Mj0iMTg4LjUiIHkyPSIyMTYuMiIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjIyMS4yIiB5MT0iMjI1LjgiIHgyPSIyMTcuMiIgeTI9IjIwNy44IiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMjUwLjAiIHkxPSIyMjMuMCIgeDI9IjI0Ni4wIiB5Mj0iMjA1LjAiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIyNzguOCIgeTE9IjIyNS44IiB4Mj0iMjc0LjgiIHkyPSIyMDcuOCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjMwNy41IiB5MT0iMjM0LjIiIHgyPSIzMDMuNSIgeTI9IjIxNi4yIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMzM2LjIiIHkxPSIyNDguMyIgeDI9IjMzMi4yIiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIzNjUuMCIgeTE9IjI2OC4wIiB4Mj0iMzYxLjAiIHkyPSIyNTAuMCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjwvc3ZnPg=='},
-  {cat:'Ресницы', img:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNTAwIj4KPHJlY3Qgd2lkdGg9IjUwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNGNUYwRTgiLz4KPGNpcmNsZSBjeD0iMjUwLjAiIGN5PSIyNTAuMCIgcj0iMjMwLjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzhBNUE0OCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjI1Ii8+CjxwYXRoIGQ9Ik0gMTEwLjAgMjEwLjAgUSAyNTAuMCAxNTUuMCAzOTAuMCAyMTAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPHBhdGggZD0iTSAxMzAuMCAyNzAuMCBRIDI1MC4wIDIyMC4wIDM3MC4wIDI3MC4wIiBmaWxsPSJub25lIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxwYXRoIGQ9Ik0gMTMwLjAgMjcwLjAgUSAyNTAuMCAzMDUuMCAzNzAuMCAyNzAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOEE1QTQ4IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC43Ii8+CjxjaXJjbGUgY3g9IjI1MC4wIiBjeT0iMjcyLjAiIHI9IjI2IiBmaWxsPSIjMkIyMTFCIi8+CjxjaXJjbGUgY3g9IjI0Mi4wIiBjeT0iMjYyLjAiIHI9IjciIGZpbGw9IiNGRkZERjkiIG9wYWNpdHk9IjAuODUiLz4KPGxpbmUgeDE9IjEzNS4wIiB5MT0iMjY4LjAiIHgyPSIxMzEuMCIgeTI9IjI1MC4wIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMTYzLjgiIHkxPSIyNDguMyIgeDI9IjE1OS44IiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxOTIuNSIgeTE9IjIzNC4yIiB4Mj0iMTg4LjUiIHkyPSIyMTYuMiIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjIyMS4yIiB5MT0iMjI1LjgiIHgyPSIyMTcuMiIgeTI9IjIwNy44IiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMjUwLjAiIHkxPSIyMjMuMCIgeDI9IjI0Ni4wIiB5Mj0iMjA1LjAiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIyNzguOCIgeTE9IjIyNS44IiB4Mj0iMjc0LjgiIHkyPSIyMDcuOCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjMwNy41IiB5MT0iMjM0LjIiIHgyPSIzMDMuNSIgeTI9IjIxNi4yIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMzM2LjIiIHkxPSIyNDguMyIgeDI9IjMzMi4yIiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIzNjUuMCIgeTE9IjI2OC4wIiB4Mj0iMzYxLjAiIHkyPSIyNTAuMCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjwvc3ZnPg=='},
-  {cat:'Брови', img:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNTAwIj4KPHJlY3Qgd2lkdGg9IjUwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNFOERFRDAiLz4KPGNpcmNsZSBjeD0iMjUwLjAiIGN5PSIyNTAuMCIgcj0iMjMwLjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzhBNUE0OCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjI1Ii8+CjxwYXRoIGQ9Ik0gMTEwLjAgMjEwLjAgUSAyNTAuMCAxNTUuMCAzOTAuMCAyMTAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPHBhdGggZD0iTSAxMzAuMCAyNzAuMCBRIDI1MC4wIDIyMC4wIDM3MC4wIDI3MC4wIiBmaWxsPSJub25lIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxwYXRoIGQ9Ik0gMTMwLjAgMjcwLjAgUSAyNTAuMCAzMDUuMCAzNzAuMCAyNzAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOEE1QTQ4IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC43Ii8+CjxjaXJjbGUgY3g9IjI1MC4wIiBjeT0iMjcyLjAiIHI9IjI2IiBmaWxsPSIjMkIyMTFCIi8+CjxjaXJjbGUgY3g9IjI0Mi4wIiBjeT0iMjYyLjAiIHI9IjciIGZpbGw9IiNGRkZERjkiIG9wYWNpdHk9IjAuODUiLz4KPGxpbmUgeDE9IjEzNS4wIiB5MT0iMjY4LjAiIHgyPSIxMzEuMCIgeTI9IjI1MC4wIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMTYzLjgiIHkxPSIyNDguMyIgeDI9IjE1OS44IiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxOTIuNSIgeTE9IjIzNC4yIiB4Mj0iMTg4LjUiIHkyPSIyMTYuMiIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjIyMS4yIiB5MT0iMjI1LjgiIHgyPSIyMTcuMiIgeTI9IjIwNy44IiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMjUwLjAiIHkxPSIyMjMuMCIgeDI9IjI0Ni4wIiB5Mj0iMjA1LjAiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIyNzguOCIgeTE9IjIyNS44IiB4Mj0iMjc0LjgiIHkyPSIyMDcuOCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjMwNy41IiB5MT0iMjM0LjIiIHgyPSIzMDMuNSIgeTI9IjIxNi4yIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMzM2LjIiIHkxPSIyNDguMyIgeDI9IjMzMi4yIiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIzNjUuMCIgeTE9IjI2OC4wIiB4Mj0iMzYxLjAiIHkyPSIyNTAuMCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjwvc3ZnPg=='},
-  {cat:'Комплекс', img:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNTAwIj4KPHJlY3Qgd2lkdGg9IjUwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNGNUYwRTgiLz4KPGNpcmNsZSBjeD0iMjUwLjAiIGN5PSIyNTAuMCIgcj0iMjMwLjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzhBNUE0OCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjI1Ii8+CjxwYXRoIGQ9Ik0gMTEwLjAgMjEwLjAgUSAyNTAuMCAxNTUuMCAzOTAuMCAyMTAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPHBhdGggZD0iTSAxMzAuMCAyNzAuMCBRIDI1MC4wIDIyMC4wIDM3MC4wIDI3MC4wIiBmaWxsPSJub25lIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxwYXRoIGQ9Ik0gMTMwLjAgMjcwLjAgUSAyNTAuMCAzMDUuMCAzNzAuMCAyNzAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOEE1QTQ4IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC43Ii8+CjxjaXJjbGUgY3g9IjI1MC4wIiBjeT0iMjcyLjAiIHI9IjI2IiBmaWxsPSIjMkIyMTFCIi8+CjxjaXJjbGUgY3g9IjI0Mi4wIiBjeT0iMjYyLjAiIHI9IjciIGZpbGw9IiNGRkZERjkiIG9wYWNpdHk9IjAuODUiLz4KPGxpbmUgeDE9IjEzNS4wIiB5MT0iMjY4LjAiIHgyPSIxMzEuMCIgeTI9IjI1MC4wIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMTYzLjgiIHkxPSIyNDguMyIgeDI9IjE1OS44IiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxOTIuNSIgeTE9IjIzNC4yIiB4Mj0iMTg4LjUiIHkyPSIyMTYuMiIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjIyMS4yIiB5MT0iMjI1LjgiIHgyPSIyMTcuMiIgeTI9IjIwNy44IiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMjUwLjAiIHkxPSIyMjMuMCIgeDI9IjI0Ni4wIiB5Mj0iMjA1LjAiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIyNzguOCIgeTE9IjIyNS44IiB4Mj0iMjc0LjgiIHkyPSIyMDcuOCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjMwNy41IiB5MT0iMjM0LjIiIHgyPSIzMDMuNSIgeTI9IjIxNi4yIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMzM2LjIiIHkxPSIyNDguMyIgeDI9IjMzMi4yIiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIzNjUuMCIgeTE9IjI2OC4wIiB4Mj0iMzYxLjAiIHkyPSIyNTAuMCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjwvc3ZnPg=='},
-  {cat:'Ресницы', img:'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MDAgNTAwIj4KPHJlY3Qgd2lkdGg9IjUwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNFOERFRDAiLz4KPGNpcmNsZSBjeD0iMjUwLjAiIGN5PSIyNTAuMCIgcj0iMjMwLjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzhBNUE0OCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjI1Ii8+CjxwYXRoIGQ9Ik0gMTEwLjAgMjEwLjAgUSAyNTAuMCAxNTUuMCAzOTAuMCAyMTAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPHBhdGggZD0iTSAxMzAuMCAyNzAuMCBRIDI1MC4wIDIyMC4wIDM3MC4wIDI3MC4wIiBmaWxsPSJub25lIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxwYXRoIGQ9Ik0gMTMwLjAgMjcwLjAgUSAyNTAuMCAzMDUuMCAzNzAuMCAyNzAuMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOEE1QTQ4IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC43Ii8+CjxjaXJjbGUgY3g9IjI1MC4wIiBjeT0iMjcyLjAiIHI9IjI2IiBmaWxsPSIjMkIyMTFCIi8+CjxjaXJjbGUgY3g9IjI0Mi4wIiBjeT0iMjYyLjAiIHI9IjciIGZpbGw9IiNGRkZERjkiIG9wYWNpdHk9IjAuODUiLz4KPGxpbmUgeDE9IjEzNS4wIiB5MT0iMjY4LjAiIHgyPSIxMzEuMCIgeTI9IjI1MC4wIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMTYzLjgiIHkxPSIyNDguMyIgeDI9IjE1OS44IiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIxOTIuNSIgeTE9IjIzNC4yIiB4Mj0iMTg4LjUiIHkyPSIyMTYuMiIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjIyMS4yIiB5MT0iMjI1LjgiIHgyPSIyMTcuMiIgeTI9IjIwNy44IiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMjUwLjAiIHkxPSIyMjMuMCIgeDI9IjI0Ni4wIiB5Mj0iMjA1LjAiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIyNzguOCIgeTE9IjIyNS44IiB4Mj0iMjc0LjgiIHkyPSIyMDcuOCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PGxpbmUgeDE9IjMwNy41IiB5MT0iMjM0LjIiIHgyPSIzMDMuNSIgeTI9IjIxNi4yIiBzdHJva2U9IiMyQjIxMUIiIHN0cm9rZS13aWR0aD0iMi41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz48bGluZSB4MT0iMzM2LjIiIHkxPSIyNDguMyIgeDI9IjMzMi4yIiB5Mj0iMjMwLjMiIHN0cm9rZT0iIzJCMjExQiIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxsaW5lIHgxPSIzNjUuMCIgeTE9IjI2OC4wIiB4Mj0iMzYxLjAiIHkyPSIyNTAuMCIgc3Ryb2tlPSIjMkIyMTFCIiBzdHJva2Utd2lkdGg9IjIuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjwvc3ZnPg=='},
-];
+let PORTFOLIO_ITEMS = FALLBACK_SERVICES.map(s=>({cat:s.category, img:s.image, title:s.name}));
 let currentPfFilter='Все';
 function renderPortfolio(){
   const cats=['Все','Брови','Ресницы','Комплекс'];
@@ -215,7 +257,7 @@ function renderPortfolio(){
     `<button class="tab-btn ${c===currentPfFilter?'active':''}" onclick="setPfFilter('${c}')">${c}</button>`).join('');
   const list = currentPfFilter==='Все'?PORTFOLIO_ITEMS:PORTFOLIO_ITEMS.filter(p=>p.cat===currentPfFilter);
   document.getElementById('portfolio-grid').innerHTML = list.map(p=>
-    `<div class="portfolio-item" onclick="openLightbox('${p.img}')"><img loading="lazy" src="${p.img}" alt="${p.cat}"></div>`).join('');
+    `<div class="portfolio-item" onclick="openLightbox('${p.img}')"><img loading="lazy" src="${p.img}" alt="${p.title||p.cat}" onerror="this.style.display='none'; this.parentElement.classList.add('image-error')"></div>`).join('');
 }
 function setPfFilter(c){ currentPfFilter=c; renderPortfolio(); }
 function openLightbox(src){ document.getElementById('pf-lightbox-img').src=src; document.getElementById('pf-lightbox').classList.add('open'); }
@@ -298,10 +340,9 @@ const Booking = {
       services = await DB.get('services');
       debugLog('Успех: получено услуг — '+(services ? services.length : 0));
     }catch(e){
-      debugLog('ОШИБКА Supabase (DB.get services): '+(e && e.message ? e.message : JSON.stringify(e)));
-      toast(dbErrorMessage(e));
-      this.close();
-      return;
+      debugLog('Supabase services недоступны — включаю локальный fallback: '+(e && e.message ? e.message : JSON.stringify(e)));
+      services = FALLBACK_SERVICES;
+      toast('Сервер записи временно недоступен. Сайт открыт в резервном режиме.');
     }
     if(serviceId){
       this.service = services.find(s=>s.id===serviceId);
@@ -353,7 +394,9 @@ const Booking = {
     let startDow = first.getDay(); startDow = startDow===0?6:startDow-1; // Mon-first
     const daysInMonth = new Date(y,m+1,0).getDate();
     const today = new Date(); today.setHours(0,0,0,0);
-    const wh = await DB.getWorkingHours();
+    let wh;
+    try { wh = await DB.getWorkingHours(); }
+    catch(e) { console.warn('working_hours недоступны, fallback', e); wh = FALLBACK_WORKING_HOURS; }
     let html = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
     for(let i=0;i<startDow;i++) html+='<div class="cal-day empty"></div>';
     for(let d=1; d<=daysInMonth; d++){
@@ -377,7 +420,19 @@ const Booking = {
     document.getElementById('w3-date-label').textContent = 'Шаг 3 из 4 · '+fmtDateFull(new Date(this.date+'T00:00:00'));
     const wrap = document.getElementById('w3-slots-wrap');
     wrap.innerHTML = `<div class="empty-state">Загружаем свободные слоты…</div>`;
-    const slots = await getAvailableSlots(this.date, this.service.duration, this.service.id);
+    let slots;
+    try {
+      slots = await getAvailableSlots(this.date, this.service.duration, this.service.id);
+    } catch(e) {
+      console.error('Ошибка загрузки слотов', e);
+      wrap.innerHTML = `<div class="empty-state">
+        <b>Онлайн-запись временно недоступна</b><br>
+        Сервер записи не подключён или Edge Function ещё не опубликована.<br>
+        <button class="btn btn-primary btn-sm" style="margin-top:14px" onclick="Booking.contactFallback()">Записаться через WhatsApp</button>
+      </div>`;
+      document.getElementById('w3-next').disabled=true;
+      return;
+    }
     if(slots.length===0){
       wrap.innerHTML = `<div class="empty-state">На выбранную дату свободных мест нет.<br>Выберите другую дату.<br><button class="btn btn-ghost btn-sm" style="margin-top:14px;" onclick="Booking.jumpNearest()">Показать ближайшие свободные даты</button></div>`;
       document.getElementById('w3-next').disabled=true;
@@ -387,6 +442,11 @@ const Booking = {
       `<button class="slot-btn ${this.time===s.time?'selected':''}" ${s.available?'':'disabled'} onclick="Booking.pickTime('${s.time}')">${s.time}${s.available?'':' занято'}</button>`
     ).join('')}</div>`;
     document.getElementById('w3-next').disabled = !this.time;
+  },
+  contactFallback(){
+    const phone='77081276005';
+    const text=`Здравствуйте! Хочу записаться на услугу «${this.service?.name||'процедуру'}». Желаемая дата: ${this.date||'не выбрана'}, время: ${this.time||'не выбрано'}.`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,'_blank');
   },
   async jumpNearest(){
     toast('Ищем ближайшую свободную дату…');
@@ -431,9 +491,18 @@ const Booking = {
 
     // Создание записи целиком идёт через Edge Function create-booking:
     // сервер сам пересчитывает занятость и не доверяет данным из браузера.
-    const { data, error } = await supabase.functions.invoke('create-booking', {
-      body: { service_id:this.service.id, date:this.date, start_time:this.time, name, phone, whatsapp:wa, comment }
-    });
+    let data, error;
+    try {
+      ({ data, error } = await supabase.functions.invoke('create-booking', {
+        body: { service_id:this.service.id, date:this.date, start_time:this.time, name, phone, whatsapp:wa, comment }
+      }));
+    } catch(e) {
+      console.error('create-booking unavailable', e);
+      if(submitBtn){ submitBtn.disabled=false; }
+      toast('Сервер записи недоступен. Попробуйте записаться через WhatsApp.');
+      this.contactFallback();
+      return;
+    }
     if(submitBtn){ submitBtn.disabled=false; }
 
     if(error || (data && data.error)){
@@ -747,7 +816,9 @@ const Admin = {
     this.closeDrawer(); toast('Услуга сохранена'); this.renderServices(); renderServices();
   },
   async renderHours(){
-    const wh = await DB.getWorkingHours();
+    let wh;
+    try { wh = await DB.getWorkingHours(); }
+    catch(e) { console.warn('working_hours недоступны, fallback', e); wh = FALLBACK_WORKING_HOURS; }
     const breaks = await DB.get('breaks');
     document.getElementById('admin-main').innerHTML = `
       <h1>Рабочее время</h1>
@@ -765,10 +836,14 @@ const Admin = {
       </div>`;
   },
   async updateHour(day, field, val){
-    const wh = await DB.getWorkingHours(); const w = wh.find(x=>x.day===day); w[field]=val; await DB.setWorkingHours(wh);
+    let wh;
+    try { wh = await DB.getWorkingHours(); }
+    catch(e) { console.warn('working_hours недоступны, fallback', e); wh = FALLBACK_WORKING_HOURS; } const w = wh.find(x=>x.day===day); w[field]=val; await DB.setWorkingHours(wh);
   },
   async toggleWorkDay(day){
-    const wh = await DB.getWorkingHours(); const w = wh.find(x=>x.day===day); w.is_working=!w.is_working;
+    let wh;
+    try { wh = await DB.getWorkingHours(); }
+    catch(e) { console.warn('working_hours недоступны, fallback', e); wh = FALLBACK_WORKING_HOURS; } const w = wh.find(x=>x.day===day); w.is_working=!w.is_working;
     if(w.is_working && !w.start){ w.start='09:00'; w.end='19:00'; }
     await DB.setWorkingHours(wh); this.renderHours();
   },
