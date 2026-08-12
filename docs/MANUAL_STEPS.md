@@ -31,6 +31,10 @@ api.telegram.org, railway.app). Отмечай выполненное `[x]`, о�
   - `SUPABASE_SERVICE_ROLE_KEY` — из Supabase Dashboard → `vlpgdiivliozzhacymaw` → Settings → API Keys (не из старого проекта).
   - `CORS_ORIGINS` — появится после деплоя frontend-сервиса (Этап 5).
 
+  **Nice-to-have (не используется кодом сейчас, но пусть будет готово на будущее — для Supabase Storage/Auth):**
+  - `SUPABASE_SERVICE_ROLE_KEY` — вставь `sb_secret_...` ключ **только в Railway → Variables** (не в файлы, не в git). Backend уже умеет читать эту переменную (`app/config.py`), но пока никакой код её не вызывает.
+  - Publishable-ключ (`sb_publishable_...`) сохранять отдельно не нужно: фронтенд обращается только к нашему backend (`VITE_API_BASE_URL`), не к Supabase напрямую.
+
   **НЕ добавлять в этот сервис** (относятся к другим/старым проектам — sports-бот, AI Sport и т.п.): `TELEGRAM_WEBHOOK_SECRET`, `ADMIN_TELEGRAM_IDS`, `ADMIN_EMAILS`, `CACHE_TTL`, `REQUEST_DELAY_MS`, `FOOTBALLDATA_API_KEY`, `FOOTBALLDATA_BASE_URL`, `CLEARSPORTS_API_KEY`, `CLEARSPORTS_BASE_URL`.
 
 - [ ] После первого деплоя проверить `https://<backend-домен>/health` → должен вернуть `{"status":"ok"}`.
