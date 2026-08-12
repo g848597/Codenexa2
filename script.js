@@ -9,10 +9,10 @@
   /* Edit these values to customize the site for a real business. */
   const BUSINESS_CONFIG = {
     masterName: "Снежана Утешева",
-    whatsapp: "77000000000", // digits only, international format, no "+"
-    phone: "+7 700 000 00 00",
-    instagram: "https://instagram.com/",
-    address: "г. Петропавловск, ул. Центральная 1",
+    whatsapp: "77081276005", // digits only, international format, no "+"
+    phone: "+7 708 127 6005",
+    instagram: "https://www.instagram.com/snezhana.utesheva",
+    address: "с. Новоишимское",
     slotInterval: 30, // minutes between bookable slot start times
     workingHours: {
       1: { start: "09:00", end: "19:00" }, // Mon
