@@ -30,61 +30,59 @@
     ]
   };
 
+  /* ================= SUPABASE ================= */
+  const SUPABASE_URL = "https://temjwwglowbuarxuixpa.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_6kcF4N5DLCpLMSoaPDNmgQ_LHFDFZUq";
+  const supabase = window.supabase
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
+  async function callEdgeFunction(name, payload) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(payload),
+    });
+    let data;
+    try { data = await res.json(); } catch { data = null; }
+    if (!res.ok) {
+      const err = new Error((data && data.error) || `HTTP_${res.status}`);
+      err.status = res.status;
+      err.code = data && data.error;
+      throw err;
+    }
+    return data;
+  }
+
   const STORAGE_KEY = "snezhana_bookings";
   const WEEKDAYS_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
   const MONTHS_RU = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 
-  /* ================= SERVICES (from price list) ================= */
-  const SERVICES = [
-    {
-      id: "lash-lamination",
-      name: "Ламинирование ресниц",
-      desc: "Изгиб, объём и питание собственных ресниц",
-      price: 8500,
-      duration: 60,
-      img: "assets/service-lash-lam.jpg"
-    },
-    {
-      id: "correction",
-      name: "Коррекция формы",
-      desc: "Аккуратная коррекция под черты лица",
-      price: 3000,
-      duration: 30,
-      img: "assets/service-correction.jpg"
-    },
-    {
-      id: "tint-correction",
-      name: "Окрашивание + коррекция",
-      desc: "Стойкий цвет и чёткая форма бровей",
-      price: 6000,
-      duration: 45,
-      img: "assets/service-tint-correction.jpg"
-    },
-    {
-      id: "lam-correction",
-      name: "Ламинирование + коррекция",
-      desc: "Уход и форма ресниц за один визит",
-      price: 7000,
-      duration: 75,
-      img: "assets/service-lam-correction.jpg"
-    },
-    {
-      id: "full-complex",
-      name: "Ламинирование + окрашивание + коррекция",
-      desc: "Полный комплекс для выразительного взгляда",
-      price: 8000,
-      duration: 90,
-      img: "assets/service-full.jpg"
-    },
-    {
-      id: "waxing",
-      name: "Ваксинг",
-      desc: "Удаление лишних волосков воском",
-      price: 500,
-      duration: 15,
-      img: "assets/service-waxing.jpg"
-    }
-  ];
+  /* ================= SERVICES (loaded from Supabase; empty until fetchServices() resolves) ================= */
+  let SERVICES = [];
+
+  async function fetchServices() {
+    if (!supabase) throw new Error("SUPABASE_CLIENT_MISSING");
+    const { data, error } = await supabase
+      .from("services")
+      .select("id, name, description, price, duration, image, active")
+      .eq("active", true)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    SERVICES = (data || []).map(s => ({
+      id: s.id,
+      name: s.name,
+      desc: s.description || "",
+      price: Number(s.price),
+      duration: s.duration,
+      img: s.image || "assets/service-lash-lam.jpg",
+    }));
+    return SERVICES;
+  }
 
   const PORTFOLIO = [
     { id: 1, category: "brows",  img: "assets/portfolio-1.jpg" },
@@ -211,11 +209,7 @@
   /* ================= DOM READY ================= */
   document.addEventListener("DOMContentLoaded", init);
 
-  function init() {
-    renderServices();
-    renderPortfolio();
-    renderReviews();
-    renderFaq();
+  async function init() {
     setupBurgerMenu();
     setupBookingModal();
     setupLightbox();
@@ -225,6 +219,20 @@
     setupRevealAnimations();
     setupContactLinks();
     setupFooterYear();
+    renderPortfolio();
+    renderReviews();
+    renderFaq();
+
+    try {
+      await fetchServices();
+      renderServices();
+      renderMiniServiceList();
+    } catch (e) {
+      console.error("fetchServices failed:", e);
+      document.getElementById("servicesGrid").innerHTML =
+        `<p style="grid-column:1/-1; font-size:13px; opacity:.7;">Не удалось загрузить прайс-лист. Проверьте подключение к интернету и обновите страницу.</p>`;
+      showToast("Не удалось загрузить услуги с сервера");
+    }
   }
 
   /* ================= RENDER: SERVICES ================= */
@@ -593,7 +601,7 @@
     `;
   }
 
-  function handleNext() {
+  async function handleNext() {
     if (state.step === 1) {
       if (!state.service) { showToast("Выберите услугу, чтобы продолжить"); return; }
       goToStep(2);
@@ -605,9 +613,33 @@
       goToStep(4);
     } else if (state.step === 4) {
       if (validateDetailsForm()) {
-        submitBooking();
-        goToStep(5);
+        const nextBtn = document.getElementById("stepNextBtn");
+        nextBtn.disabled = true;
+        const originalLabel = nextBtn.textContent;
+        nextBtn.textContent = "Отправка…";
+        try {
+          await submitBooking();
+          goToStep(5);
+        } catch (e) {
+          console.error("submitBooking failed:", e);
+          showToast(bookingErrorMessage(e));
+        } finally {
+          nextBtn.textContent = originalLabel;
+          nextBtn.disabled = false;
+        }
       }
+    }
+  }
+
+  function bookingErrorMessage(e) {
+    switch (e && e.code) {
+      case "SLOT_TAKEN": return "Это время уже заняли, пока вы заполняли форму. Выберите другое.";
+      case "RATE_LIMITED": return "Слишком много попыток записи подряд. Попробуйте через несколько минут.";
+      case "DATE_IN_PAST":
+      case "TIME_IN_PAST": return "Выбранное время уже прошло. Выберите другое.";
+      case "OUTSIDE_WORKING_HOURS":
+      case "DAY_OFF": return "В это время мастер не работает. Выберите другой день или время.";
+      default: return "Не удалось отправить запись. Проверьте интернет и попробуйте ещё раз.";
     }
   }
 
@@ -708,13 +740,26 @@
   }
 
   /* ---------- STEP 3: TIME SLOTS ---------- */
-  function renderTimeGrid() {
+  async function renderTimeGrid() {
     const grid = document.getElementById("timeGrid");
     const label = document.getElementById("timeSectionLabel");
     if (!state.selectedDate || !state.service) { grid.innerHTML = ""; return; }
 
     label.textContent = `${formatDateRu(state.selectedDate)} — свободное время`;
-    const slots = generateSlotsForDate(state.selectedDate, state.service.duration);
+    grid.innerHTML = `<p style="grid-column:1/-1; font-size:13px; opacity:.6;">Загрузка расписания…</p>`;
+
+    let slots;
+    try {
+      const res = await callEdgeFunction("get-available-slots", {
+        date: dateKey(state.selectedDate),
+        service_id: state.service.id,
+      });
+      slots = res.slots || [];
+    } catch (e) {
+      console.error("get-available-slots failed:", e);
+      grid.innerHTML = `<p style="grid-column:1/-1; font-size:13px; opacity:.7;">Не удалось загрузить расписание. Возможно, серверная функция ещё не задеплоена в Supabase. Попробуйте позже.</p>`;
+      return;
+    }
 
     if (!slots.length) {
       grid.innerHTML = `<p style="grid-column:1/-1; font-size:13px; opacity:.6;">На эту дату нет доступного времени. Пожалуйста, выберите другой день.</p>`;
@@ -779,25 +824,32 @@
   }
 
   /* ---------- STEP 4->5: SUBMIT ---------- */
-  function submitBooking() {
+  async function submitBooking() {
     const s = state.service;
-    const startMin = toMinutes(state.selectedTime);
-    const endMin = startMin + s.duration;
-    const booking = {
-      id: "bk_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
-      name: state.customer.name,
+    const res = await callEdgeFunction("create-booking", {
+      client_name: state.customer.name,
       phone: state.customer.phone,
       whatsapp: state.customer.whatsapp,
-      service: s.name,
-      price: s.price,
-      duration: s.duration,
+      service_id: s.id,
       date: dateKey(state.selectedDate),
-      startTime: state.selectedTime,
-      endTime: toHHMM(endMin),
+      start_time: state.selectedTime,
       comment: state.customer.comment,
-      status: "confirmed"
+    });
+    const b = res.booking;
+    const booking = {
+      id: b.id,
+      name: b.client_name,
+      phone: b.phone,
+      whatsapp: b.whatsapp,
+      service: b.service_name,
+      price: Number(b.price),
+      duration: s.duration,
+      date: b.date,
+      startTime: b.start_time.slice(0, 5),
+      endTime: b.end_time.slice(0, 5),
+      comment: b.comment,
+      status: b.status,
     };
-    saveBooking(booking);
     state.lastBooking = booking;
     renderSuccessCard(booking);
   }
@@ -889,6 +941,12 @@
     toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 2600);
   }
 
-  // Expose config/data for admin.html
-  window.__SNEZHANA__ = { BUSINESS_CONFIG, SERVICES, getBookings, STORAGE_KEY };
+  // Expose config/data for admin.html (function form so it always reflects
+  // the current SERVICES value, not a stale reference captured before fetch).
+  window.__SNEZHANA__ = {
+    BUSINESS_CONFIG,
+    getServices: () => SERVICES,
+    getBookings,
+    STORAGE_KEY,
+  };
 })();
