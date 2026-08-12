@@ -2,357 +2,344 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Снежана Утешева — Бровист и Ламимейкер</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Снежана Утешева — Бровист и Ламинейкер</title>
 <meta name="description" content="Профессиональное оформление бровей и ламинирование ресниц. Онлайн-запись к Снежане Утешевой.">
-<meta property="og:title" content="Снежана Утешева — Бровист и Ламимейкер">
-<meta property="og:description" content="Взгляд, который держит форму. Онлайн-запись за 60 секунд.">
+
+<meta property="og:title" content="Снежана Утешева — Бровист и Ламинейкер">
+<meta property="og:description" content="Взгляд, который держит форму. Брови и ресницы — аккуратно, стойко и по-настоящему красиво.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%238A5A48'/%3E%3Ctext x='50' y='68' font-size='55' fill='%23F5F0E8' text-anchor='middle' font-family='Georgia'%3EС%3C/text%3E%3C/svg%3E">
+<meta property="og:image" content="assets/hero.jpg">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='%232B211B'/%3E%3Cpath d='M20 55 Q50 30 80 55' stroke='%23F5F0E8' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BeautySalon","name":"Снежана Утешева — Бровист и Ламимейкер","description":"Оформление бровей, ламинирование ресниц","priceRange":"₸₸"}
-</script>
-<link rel="stylesheet" href="/styles.css">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div style="position:fixed;top:50px;left:0;right:0;z-index:999999;background:#c0392b;color:#fff;padding:8px;text-align:center;font:14px/1.3 sans-serif;">ТЕСТ-МЕТКА v3 · если видишь этот красный блок — страница обновилась</div>
+<a href="#main" class="skip-link">Перейти к содержимому</a>
 
-<!-- ============ SITE ============ -->
-<div id="site-root">
+<div class="app-shell">
 
-<header id="site-header">
-  <div class="nav-inner">
-    <a href="#home" class="logo">Снежана <span>Утешева</span></a>
-    <nav class="nav-links">
-      <a href="#home">Главная</a>
+  <!-- ============ HEADER ============ -->
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-name">Снежана Утешева</span>
+      <span class="brand-role">Бровист · Ламинейкер</span>
+    </div>
+    <button class="burger" id="burgerBtn" aria-label="Открыть меню" aria-expanded="false" aria-controls="mobileNav">
+      <span class="burger-lines"><span></span><span></span><span></span></span>
+    </button>
+  </header>
+
+  <!-- ============ MOBILE NAV ============ -->
+  <nav class="mobile-nav" id="mobileNav" aria-hidden="true">
+    <div class="mobile-nav-top">
+      <div class="brand">
+        <span class="brand-name">Снежана Утешева</span>
+        <span class="brand-role">Бровист · Ламинейкер</span>
+      </div>
+      <button class="nav-close" id="navCloseBtn" aria-label="Закрыть меню">✕</button>
+    </div>
+    <ul class="mobile-nav-list">
+      <li><a href="#hero" data-nav-link>Главная</a></li>
+      <li><a href="#services" data-nav-link>Услуги</a></li>
+      <li><a href="#portfolio" data-nav-link>Работы</a></li>
+      <li><a href="#about" data-nav-link>Обо мне</a></li>
+      <li><a href="#reviews" data-nav-link>Отзывы</a></li>
+      <li><a href="#faq" data-nav-link>FAQ</a></li>
+      <li><a href="#contacts" data-nav-link>Контакты</a></li>
+    </ul>
+    <div class="mobile-nav-cta">
+      <div class="mobile-nav-social">
+        <a href="tel:+77000000000">Телефон</a>
+        <a href="https://instagram.com/" target="_blank" rel="noopener">Instagram</a>
+      </div>
+      <button class="btn btn-primary btn-block" data-open-booking style="margin-top:14px;">Записаться</button>
+    </div>
+  </nav>
+
+  <main id="main">
+
+    <!-- ============ HERO ============ -->
+    <section class="hero" id="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">Бровист · Ламинейкер</span>
+        <h1 class="hero-title">Снежана<br>Утешева</h1>
+        <p class="hero-tagline">Взгляд, который держит форму.</p>
+        <p class="hero-desc">Брови и ресницы — аккуратно, стойко и по-настоящему красиво.</p>
+      </div>
+      <div class="hero-media">
+        <img src="assets/hero.jpg" alt="Снежана Утешева — оформление бровей и ресниц" width="1000" height="1300">
+      </div>
+      <div class="hero-actions">
+        <button class="btn btn-primary btn-block" data-open-booking>Записаться онлайн</button>
+        <a href="#portfolio" class="btn btn-outline btn-block">Посмотреть работы</a>
+      </div>
+      <div class="hero-quickfacts">
+        <div class="quickfact"><div class="quickfact-icon">◇</div><div class="quickfact-text">Индивидуальный подход</div></div>
+        <div class="quickfact"><div class="quickfact-icon">✦</div><div class="quickfact-text">Качественные материалы</div></div>
+        <div class="quickfact"><div class="quickfact-icon">✎</div><div class="quickfact-text">Аккуратная работа</div></div>
+        <div class="quickfact"><div class="quickfact-icon">○</div><div class="quickfact-text">Комфортная атмосфера</div></div>
+      </div>
+    </section>
+
+    <!-- ============ SERVICES ============ -->
+    <section class="section" id="services">
+      <div class="section-head reveal">
+        <span class="eyebrow">Прайс-лист</span>
+        <h2 class="section-title">Услуги</h2>
+        <div class="divider-mark"></div>
+      </div>
+      <div class="services-grid" id="servicesGrid"><!-- injected by script.js --></div>
+    </section>
+
+    <!-- ============ PORTFOLIO ============ -->
+    <section class="section section-taupe" id="portfolio">
+      <div class="section-head reveal">
+        <span class="eyebrow">Портфолио</span>
+        <h2 class="section-title">Работы</h2>
+        <div class="divider-mark"></div>
+      </div>
+      <div class="filter-row" role="tablist" aria-label="Фильтр работ">
+        <button class="filter-chip is-active" data-filter="all" role="tab" aria-selected="true">Все</button>
+        <button class="filter-chip" data-filter="brows" role="tab" aria-selected="false">Брови</button>
+        <button class="filter-chip" data-filter="lashes" role="tab" aria-selected="false">Ресницы</button>
+        <button class="filter-chip" data-filter="combo" role="tab" aria-selected="false">Комплекс</button>
+      </div>
+      <div class="portfolio-grid" id="portfolioGrid"><!-- injected by script.js --></div>
+    </section>
+
+    <!-- ============ ABOUT ============ -->
+    <section class="section" id="about">
+      <div class="section-head reveal">
+        <span class="eyebrow">Мастер</span>
+        <h2 class="section-title">О мастере</h2>
+        <div class="divider-mark"></div>
+      </div>
+      <div class="about-photo reveal">
+        <img src="assets/master.jpg" alt="Портрет мастера Снежаны Утешевой" width="900" height="1100" loading="lazy">
+      </div>
+      <div class="about-text reveal">
+        <p>Меня зовут Снежана Утешева.</p>
+        <p>Я работаю с бровями и ресницами, уделяя внимание не только результату, но и тому, насколько гармонично он подходит именно вам.</p>
+        <p>Для меня красота — это аккуратность, естественность и внимание к деталям.</p>
+      </div>
+      <p class="about-signature">С заботой, Снежана</p>
+    </section>
+
+    <!-- ============ WHY US ============ -->
+    <section class="section section-taupe" id="why">
+      <div class="section-head reveal">
+        <span class="eyebrow">Преимущества</span>
+        <h2 class="section-title">Почему я</h2>
+        <div class="divider-mark"></div>
+      </div>
+      <div class="why-grid">
+        <div class="why-card reveal">
+          <div class="why-icon">◇</div>
+          <div class="why-title">Индивидуальный подход</div>
+          <div class="why-desc">Форма и результат под особенности именно вашего лица.</div>
+        </div>
+        <div class="why-card reveal">
+          <div class="why-icon">✦</div>
+          <div class="why-title">Качественные материалы</div>
+          <div class="why-desc">Профессиональный подход к каждой процедуре.</div>
+        </div>
+        <div class="why-card reveal">
+          <div class="why-icon">✎</div>
+          <div class="why-title">Аккуратность</div>
+          <div class="why-desc">Внимание к каждой детали.</div>
+        </div>
+        <div class="why-card reveal">
+          <div class="why-icon">○</div>
+          <div class="why-title">Комфорт</div>
+          <div class="why-desc">Спокойная и приятная атмосфера.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ REVIEWS ============ -->
+    <section class="section" id="reviews">
+      <div class="section-head reveal">
+        <span class="eyebrow">Отзывы</span>
+        <h2 class="section-title">Что говорят клиенты</h2>
+        <div class="divider-mark"></div>
+      </div>
+      <div class="reviews-track" id="reviewsTrack"><!-- injected by script.js --></div>
+    </section>
+
+    <!-- ============ FAQ ============ -->
+    <section class="section section-taupe" id="faq">
+      <div class="section-head reveal">
+        <span class="eyebrow">Вопросы</span>
+        <h2 class="section-title">FAQ</h2>
+        <div class="divider-mark"></div>
+      </div>
+      <div id="faqList"><!-- injected by script.js --></div>
+    </section>
+
+    <!-- ============ CONTACTS ============ -->
+    <section class="section" id="contacts">
+      <div class="section-head reveal">
+        <span class="eyebrow">Связаться</span>
+        <h2 class="section-title">Контакты</h2>
+        <div class="divider-mark"></div>
+      </div>
+      <p style="font-family:var(--font-display); font-size:18px; margin-bottom:4px;">Снежана Утешева</p>
+      <p style="font-size:12px; opacity:.6; text-transform:uppercase; letter-spacing:.06em; margin-bottom:20px;">Бровист · Ламинейкер</p>
+      <div class="contact-list">
+        <a class="contact-row" href="tel:+77000000000" aria-label="Позвонить">
+          <span class="contact-icon">☎</span>
+          <span><span class="contact-label">Телефон</span><br><span class="contact-value">+7 700 000 00 00</span></span>
+        </a>
+        <a class="contact-row" id="contactWhatsapp" href="#" target="_blank" rel="noopener" aria-label="Написать в WhatsApp">
+          <span class="contact-icon">✆</span>
+          <span><span class="contact-label">WhatsApp</span><br><span class="contact-value">Написать сообщение</span></span>
+        </a>
+        <a class="contact-row" href="https://instagram.com/" target="_blank" rel="noopener" aria-label="Открыть Instagram">
+          <span class="contact-icon">◎</span>
+          <span><span class="contact-label">Instagram</span><br><span class="contact-value">@snezhana.brows</span></span>
+        </a>
+        <div class="contact-row">
+          <span class="contact-icon">⌖</span>
+          <span><span class="contact-label">Адрес</span><br><span class="contact-value">г. Петропавловск, ул. Центральная 1</span></span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="site-footer">
+    <div class="footer-brand">Снежана Утешева</div>
+    <div class="footer-role">Бровист · Ламинейкер</div>
+    <div class="footer-links">
       <a href="#services">Услуги</a>
       <a href="#portfolio">Работы</a>
       <a href="#about">Обо мне</a>
-    </nav>
-    <div class="nav-cta">
-      <button class="btn btn-primary btn-sm" onclick="Booking.open()">Записаться</button>
-      <div class="burger" onclick="toggleMobileMenu(true)"><span></span><span></span><span></span></div>
+      <a href="#faq">FAQ</a>
+      <a href="#contacts">Контакты</a>
+    </div>
+    <div class="footer-copy">© 2026 Снежана Утешева. Все права защищены.</div>
+  </footer>
+
+  <!-- ============ FIXED CTA ============ -->
+  <div class="fixed-cta-spacer"></div>
+  <div class="fixed-cta" id="fixedCta">
+    <button class="btn btn-primary" data-open-booking aria-label="Записаться онлайн">Записаться</button>
+  </div>
+
+  <!-- ============ BOOKING MODAL ============ -->
+  <div class="booking-modal" id="bookingModal" role="dialog" aria-modal="true" aria-labelledby="bookingTitle" aria-hidden="true">
+    <div class="booking-header">
+      <span class="booking-title" id="bookingTitle">Онлайн-запись</span>
+      <button class="booking-close" id="bookingCloseBtn" aria-label="Закрыть окно записи">✕</button>
+    </div>
+
+    <div class="booking-body">
+      <div class="progress-track" id="progressTrack">
+        <div class="progress-step" data-step="1"><span class="progress-num">01</span><span class="progress-label">Услуга</span></div>
+        <div class="progress-step" data-step="2"><span class="progress-num">02</span><span class="progress-label">Дата</span></div>
+        <div class="progress-step" data-step="3"><span class="progress-num">03</span><span class="progress-label">Время</span></div>
+        <div class="progress-step" data-step="4"><span class="progress-num">04</span><span class="progress-label">Данные</span></div>
+        <div class="progress-step" data-step="5"><span class="progress-num">05</span><span class="progress-label">Готово</span></div>
+      </div>
+
+      <!-- STEP 1: SERVICE -->
+      <div class="booking-step" data-step-panel="1">
+        <div class="mini-service-list" id="miniServiceList"><!-- injected --></div>
+      </div>
+
+      <!-- STEP 2: DATE -->
+      <div class="booking-step" data-step-panel="2">
+        <div class="selected-summary" id="summaryStep2"></div>
+        <div class="calendar-card">
+          <div class="calendar-head">
+            <button class="cal-nav" id="calPrev" aria-label="Предыдущий месяц">‹</button>
+            <span class="calendar-title" id="calendarTitle"></span>
+            <button class="cal-nav" id="calNext" aria-label="Следующий месяц">›</button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+          </div>
+          <div class="calendar-days" id="calendarDays"></div>
+        </div>
+      </div>
+
+      <!-- STEP 3: TIME -->
+      <div class="booking-step" data-step-panel="3">
+        <div class="selected-summary" id="summaryStep3"></div>
+        <p class="time-section-label" id="timeSectionLabel">Выберите время</p>
+        <div class="time-grid" id="timeGrid"></div>
+      </div>
+
+      <!-- STEP 4: DETAILS -->
+      <div class="booking-step" data-step-panel="4">
+        <div class="selected-summary" id="summaryStep4"></div>
+        <form id="detailsForm" novalidate>
+          <div class="form-field" id="fieldName">
+            <label for="inputName">Ваше имя</label>
+            <input type="text" id="inputName" name="name" autocomplete="name" placeholder="Анна">
+            <span class="field-error">Пожалуйста, укажите имя.</span>
+          </div>
+          <div class="form-field" id="fieldPhone">
+            <label for="inputPhone">Номер телефона</label>
+            <input type="tel" id="inputPhone" name="phone" autocomplete="tel" placeholder="+7 777 123 45 67">
+            <span class="field-error">Укажите корректный номер телефона.</span>
+          </div>
+          <div class="form-field" id="fieldWhatsapp">
+            <label for="inputWhatsapp">WhatsApp</label>
+            <input type="tel" id="inputWhatsapp" name="whatsapp" autocomplete="tel" placeholder="+7 777 123 45 67">
+            <span class="field-error">Укажите номер WhatsApp.</span>
+          </div>
+          <div class="form-field">
+            <label for="inputComment">Комментарий (необязательно)</label>
+            <textarea id="inputComment" name="comment" placeholder="Хочу натуральный результат"></textarea>
+          </div>
+          <div class="checkbox-field" id="fieldConsent">
+            <input type="checkbox" id="inputConsent" name="consent">
+            <label for="inputConsent">Я согласен(на) на обработку персональных данных.</label>
+          </div>
+        </form>
+      </div>
+
+      <!-- STEP 5: SUCCESS -->
+      <div class="booking-step" data-step-panel="5">
+        <div class="success-wrap">
+          <div class="success-check">✓</div>
+          <h3 class="success-title">Запись подтверждена!</h3>
+          <div class="success-card" id="successCard"></div>
+          <div class="success-actions">
+            <button class="btn btn-primary btn-block" id="addToCalendarBtn">Добавить в календарь</button>
+            <a class="btn btn-outline btn-block" id="whatsappConfirmBtn" href="#" target="_blank" rel="noopener">Написать в WhatsApp</a>
+            <button class="btn btn-ghost btn-block" id="goHomeBtn">На главную</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="booking-footer" id="bookingFooter">
+      <button class="btn btn-ghost" id="stepBackBtn">Назад</button>
+      <button class="btn btn-primary" id="stepNextBtn">Далее</button>
     </div>
   </div>
-</header>
 
-<div class="mobile-menu" id="mobile-menu">
-  <div class="close-x" onclick="toggleMobileMenu(false)">✕</div>
-  <a href="#home" onclick="toggleMobileMenu(false)">Главная</a>
-  <a href="#services" onclick="toggleMobileMenu(false)">Услуги</a>
-  <a href="#portfolio" onclick="toggleMobileMenu(false)">Работы</a>
-  <a href="#about" onclick="toggleMobileMenu(false)">Обо мне</a>
-  <a href="#contacts" onclick="toggleMobileMenu(false)">Контакты</a>
-  <button class="btn btn-primary" style="margin-top:10px;" onclick="toggleMobileMenu(false); Booking.open();">Записаться онлайн</button>
+  <!-- ============ LIGHTBOX ============ -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Просмотр фотографии">
+    <button class="lightbox-close" id="lightboxClose" aria-label="Закрыть">✕</button>
+    <button class="lightbox-nav lightbox-prev" id="lightboxPrev" aria-label="Предыдущее фото">‹</button>
+    <div class="lightbox-img-wrap"><img id="lightboxImg" src="" alt=""></div>
+    <button class="lightbox-nav lightbox-next" id="lightboxNext" aria-label="Следующее фото">›</button>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 </div>
 
-<!-- HERO -->
-<section class="hero" id="home">
-  <div class="container hero-grid">
-    <div class="hero-text">
-      <div class="eyebrow">Бровист • Ламимейкер</div>
-      <h1>Снежана<br><em>Утешева</em></h1>
-      <p class="hero-tagline">«Взгляд, который держит форму»</p>
-      <p class="hero-desc">Брови и ресницы — аккуратно, стойко и по-настоящему красиво. Индивидуальный подход к каждому лицу.</p>
-      <div class="hero-ctas">
-        <button class="btn btn-primary" onclick="Booking.open()">Записаться онлайн</button>
-        <a class="btn btn-outline" href="#portfolio">Посмотреть работы</a>
-      </div>
-      <div class="hero-badges">
-        <div class="hero-badge"><span class="star">★</span> Индивидуальный подбор формы</div>
-        <div class="hero-badge"><span class="star">★</span> Профессиональные материалы</div>
-        <div class="hero-badge"><span class="star">★</span> Аккуратная работа</div>
-        <div class="hero-badge"><span class="star">★</span> Комфортная атмосфера</div>
-      </div>
-    </div>
-    <div class="hero-media reveal">
-      <div class="frame"><img src="https://images.unsplash.com/photo-1583001931096-959e9a1a6223?q=80&w=1000&auto=format&fit=crop" alt="Оформление бровей" loading="eager"></div>
-      <div class="float-card">4.9 / 5<small>По отзывам клиентов</small></div>
-    </div>
-  </div>
-</section>
-
-<!-- ABOUT -->
-<section class="section" id="about">
-  <div class="container about-grid">
-    <div class="about-media reveal"><img src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?q=80&w=1000&auto=format&fit=crop" alt="Снежана Утешева" loading="lazy">
-    </div>
-    <div class="about-text reveal">
-      <div class="eyebrow">О мастере</div>
-      <h2>Красота — это&nbsp;аккуратность и&nbsp;внимание к деталям</h2>
-      <p>Меня зовут Снежана Утешева. Я работаю с бровями и ресницами, уделяя внимание не только результату, но и тому, насколько гармонично он подходит именно вам.</p>
-      <p>Для меня красота — это аккуратность, естественность и внимание к деталям.</p>
-      <p class="about-quote">«Каждое лицо индивидуально — и форма бровей должна это подчёркивать»</p>
-    </div>
-  </div>
-</section>
-
-<!-- SERVICES -->
-<section class="section secondary-bg" id="services">
-  <div class="container">
-    <div class="section-head reveal">
-      <div class="eyebrow">Прайс-лист</div>
-      <h2>Услуги</h2>
-      <p>Подбор формы, окрашивание и ламинирование — для выразительного и ухоженного взгляда каждый день.</p>
-    </div>
-    <div class="services-tabs" id="services-tabs"></div>
-    <div class="services-grid" id="services-grid"></div>
-  </div>
-</section>
-
-<!-- PORTFOLIO -->
-<section class="section" id="portfolio">
-  <div class="container">
-    <div class="section-head reveal">
-      <div class="eyebrow">Работы</div>
-      <h2>Портфолио</h2>
-    </div>
-    <div class="services-tabs" id="portfolio-tabs"></div>
-    <div class="portfolio-grid" id="portfolio-grid"></div>
-  </div>
-</section>
-<div class="pf-lightbox" id="pf-lightbox"><div class="close-x" onclick="closeLightbox()">✕</div><img id="pf-lightbox-img" src=""></div>
-
-<!-- WHY ME -->
-<section class="section secondary-bg">
-  <div class="container">
-    <div class="section-head reveal">
-      <div class="eyebrow">Почему я</div>
-      <h2>Причины выбрать меня</h2>
-    </div>
-    <div class="why-grid">
-      <div class="why-item reveal"><div class="num">01</div><h3>Индивидуальный подход</h3><p>Форма и результат под особенности именно вашего лица.</p></div>
-      <div class="why-item reveal"><div class="num">02</div><h3>Качественные материалы</h3><p>Используются профессиональные средства.</p></div>
-      <div class="why-item reveal"><div class="num">03</div><h3>Аккуратность</h3><p>Внимание к каждой детали работы.</p></div>
-      <div class="why-item reveal"><div class="num">04</div><h3>Комфорт</h3><p>Спокойная и приятная атмосфера студии.</p></div>
-    </div>
-  </div>
-</section>
-
-<!-- PROCESS -->
-<section class="section">
-  <div class="container">
-    <div class="section-head reveal">
-      <div class="eyebrow">Как это происходит</div>
-      <h2>Процесс работы</h2>
-    </div>
-    <div class="process-list">
-      <div class="process-row reveal"><div class="num">01</div><div><h3>Онлайн-запись</h3><p>Выбираете услугу, удобную дату и время — это займёт около минуты.</p></div></div>
-      <div class="process-row reveal"><div class="num">02</div><div><h3>Консультация</h3><p>Обсуждаем форму и желаемый результат перед началом процедуры.</p></div></div>
-      <div class="process-row reveal"><div class="num">03</div><div><h3>Процедура</h3><p>Аккуратная работа с профессиональными материалами.</p></div></div>
-      <div class="process-row reveal"><div class="num">04</div><div><h3>Результат</h3><p>Вы уходите с идеальной формой и рекомендациями по уходу.</p></div></div>
-    </div>
-  </div>
-</section>
-
-<!-- REVIEWS -->
-<section class="section secondary-bg">
-  <div class="container">
-    <div class="section-head reveal">
-      <div class="eyebrow">Отзывы</div>
-      <h2>Что говорят клиенты</h2>
-    </div>
-    <div class="reviews-grid" id="reviews-grid"></div>
-  </div>
-</section>
-
-<!-- FAQ -->
-<section class="section" id="faq">
-  <div class="container">
-    <div class="section-head reveal">
-      <div class="eyebrow">Вопросы</div>
-      <h2>Часто спрашивают</h2>
-    </div>
-    <div class="faq-list" id="faq-list"></div>
-  </div>
-</section>
-
-<!-- CONTACTS -->
-<section class="section secondary-bg" id="contacts">
-  <div class="container contact-grid">
-    <div class="contact-info reveal">
-      <h2>Снежана Утешева</h2>
-      <p class="role">Бровист • Ламимейкер</p>
-      <div class="contact-line"><b>Телефон</b> <span id="c-phone"></span></div>
-      <div class="contact-line"><b>WhatsApp</b> <span id="c-wa"></span></div>
-      <div class="contact-line"><b>Instagram</b> <span id="c-inst"></span></div>
-      <div class="contact-line"><b>Адрес</b> <span id="c-addr"></span></div>
-      <div class="contact-ctas">
-        <button class="btn btn-primary" onclick="openWhatsApp()">WhatsApp</button>
-        <a class="btn btn-ghost" id="c-inst-link" href="#" target="_blank">Instagram</a>
-        <a class="btn btn-outline" id="c-tel-link" href="#">Позвонить</a>
-      </div>
-    </div>
-    <div class="map-box reveal">
-      <iframe loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=82.54%2C49.94%2C82.62%2C49.98&layer=mapnik" title="Карта"></iframe>
-    </div>
-  </div>
-</section>
-
-<footer>
-  <div class="container">
-    <div class="footer-grid">
-      <div>
-        <div class="logo">Снежана <span>Утешева</span></div>
-        <p class="tag">Взгляд, который держит форму. Оформление бровей и ламинирование ресниц.</p>
-      </div>
-      <div>
-        <h4>Навигация</h4>
-        <a href="#services">Услуги</a>
-        <a href="#portfolio">Работы</a>
-        <a href="#about">Обо мне</a>
-        <a href="#contacts">Контакты</a>
-      </div>
-      <div>
-        <h4>Связаться</h4>
-        <span class="fline" id="f-phone"></span>
-        <span class="fline" id="f-inst"></span>
-        <span class="fline" id="f-addr"></span>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <span>© 2026 Снежана Утешева. Все права защищены.</span>
-      <span>Онлайн-запись работает 24/7</span>
-    </div>
-  </div>
-</footer>
-
-<button class="floating-book" onclick="Booking.open()">Записаться</button>
-<button class="mobile-floating-book" onclick="Booking.open()">Записаться</button>
-
-</div><!-- /site-root -->
-
-<!-- ============ BOOKING MODAL ============ -->
-<div class="modal-overlay" id="booking-overlay">
-  <div class="booking-modal">
-    <div class="modal-close" onclick="Booking.close()">✕</div>
-    <div class="wizard-steps" id="wizard-steps"></div>
-
-    <!-- STEP 1: SERVICE -->
-    <div class="wstep" data-step="1">
-      <div class="modal-title">Выберите услугу</div>
-      <div class="modal-sub">Шаг 1 из 4</div>
-      <div id="wizard-service-list"></div>
-      <div class="wizard-nav"><button class="btn btn-primary" id="w1-next" disabled onclick="Booking.next()">Продолжить</button></div>
-    </div>
-
-    <!-- STEP 2: DATE -->
-    <div class="wstep" data-step="2">
-      <div class="modal-title">Выберите дату</div>
-      <div class="modal-sub" id="w2-service-label">Шаг 2 из 4</div>
-      <div class="cal-head">
-        <button onclick="Booking.calShift(-1)">‹</button>
-        <div class="cal-month" id="cal-month"></div>
-        <button onclick="Booking.calShift(1)">›</button>
-      </div>
-      <div class="cal-grid" id="cal-grid"></div>
-      <div class="wizard-nav">
-        <button class="btn btn-ghost" onclick="Booking.back()">Назад</button>
-        <button class="btn btn-primary" id="w2-next" disabled onclick="Booking.next()">Продолжить</button>
-      </div>
-    </div>
-
-    <!-- STEP 3: TIME -->
-    <div class="wstep" data-step="3">
-      <div class="modal-title">Свободное время</div>
-      <div class="modal-sub" id="w3-date-label">Шаг 3 из 4</div>
-      <div id="w3-slots-wrap"></div>
-      <div class="wizard-nav">
-        <button class="btn btn-ghost" onclick="Booking.back()">Назад</button>
-        <button class="btn btn-primary" id="w3-next" disabled onclick="Booking.next()">Продолжить</button>
-      </div>
-    </div>
-
-    <!-- STEP 4: FORM -->
-    <div class="wstep" data-step="4">
-      <div class="modal-title">Ваши данные</div>
-      <div class="modal-sub">Шаг 4 из 4</div>
-      <div class="form-summary" id="w4-summary"></div>
-      <div class="form-field">
-        <label>Ваше имя</label>
-        <input type="text" id="f-name" placeholder="Как к вам обращаться">
-        <div class="form-err" id="err-name">Пожалуйста, укажите имя</div>
-      </div>
-      <div class="form-field">
-        <label>Номер телефона</label>
-        <input type="tel" id="f-phone2" placeholder="+7 (___) ___-__-__">
-        <div class="form-err" id="err-phone">Укажите корректный номер телефона</div>
-      </div>
-      <div class="form-field">
-        <label>WhatsApp (если отличается)</label>
-        <input type="tel" id="f-wa" placeholder="+7 (___) ___-__-__">
-      </div>
-      <div class="form-field">
-        <label>Комментарий</label>
-        <textarea id="f-comment" placeholder="Есть ли у вас пожелания?"></textarea>
-      </div>
-      <div class="wizard-nav">
-        <button class="btn btn-ghost" onclick="Booking.back()">Назад</button>
-        <button class="btn btn-primary" id="w4-submit" onclick="Booking.submit()">Подтвердить запись</button>
-      </div>
-    </div>
-
-    <!-- STEP 5: SUCCESS -->
-    <div class="wstep" data-step="5">
-      <div class="success-icon">✓</div>
-      <div class="modal-title" style="text-align:center;">Запись подтверждена</div>
-      <div class="modal-sub" style="text-align:center;">Снежана Утешева</div>
-      <div class="success-card" id="success-card"></div>
-      <div class="wizard-nav" style="flex-direction:column;">
-        <button class="btn btn-primary" onclick="Booking.addToCalendar()">Добавить в календарь</button>
-        <button class="btn btn-ghost" onclick="Booking.sendWhatsAppConfirm()">Написать в WhatsApp</button>
-        <button class="btn btn-outline" onclick="Booking.close()">Вернуться на сайт</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ============ ADMIN ============ -->
-<div id="admin-root">
-  <div class="admin-login-wrap" id="admin-login-view">
-    <div class="admin-login-box">
-      <h2>Вход в панель</h2>
-      <p class="hint">/admin/login</p>
-      <div class="admin-label">Email</div>
-      <input class="admin-input" id="admin-email" autocomplete="username">
-      <div class="admin-label">Пароль</div>
-      <input class="admin-input" type="password" id="admin-pass" placeholder="Введите пароль" autocomplete="current-password">
-      <div class="form-err" id="admin-login-err">Неверный email или пароль</div>
-      <button class="btn btn-primary" style="width:100%; margin-top:8px;" onclick="Admin.login()">Войти</button>
-      <p class="hint"><a href="#home">← Вернуться на сайт</a></p>
-    </div>
-  </div>
-
-  <div class="admin-shell" id="admin-shell-view" style="display:none;">
-    <div class="admin-sidebar">
-      <div class="logo">С. <span style="color:#d9a98d;">Admin</span></div>
-      <div class="admin-nav" id="admin-nav">
-        <a data-tab="dashboard">Дашборд</a>
-        <a data-tab="calendar">Календарь</a>
-        <a data-tab="bookings">Записи</a>
-        <a data-tab="services">Услуги</a>
-        <a data-tab="hours">Рабочее время</a>
-        <a data-tab="blocked">Блокировки</a>
-        <a data-tab="reviews">Отзывы</a>
-        <a data-tab="settings">Настройки</a>
-      </div>
-      <a class="logout" onclick="Admin.logout()">Выйти →</a>
-    </div>
-    <div class="admin-main" id="admin-main"></div>
-  </div>
-</div>
-
-<div class="admin-drawer-overlay" id="admin-drawer-overlay">
-  <div class="admin-drawer" id="admin-drawer-content"></div>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="/app.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
+<script src="script.js"></script>
 </body>
 </html>

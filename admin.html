@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Демо-панель записей — Снежана Утешева</title>
+<meta name="robots" content="noindex, nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#F5F0E8; --taupe:#E8DED0; --dark:#2B211B; --brown:#8A5A48; --ivory:#FFFDF9;
+    --line:rgba(43,33,27,0.12);
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; font-family:"Manrope",sans-serif; background:var(--taupe); color:var(--dark);
+    padding:20px 16px 60px;
+  }
+  .wrap{ max-width:720px; margin:0 auto; }
+  h1{ font-family:"Cormorant Garamond",serif; font-size:26px; margin:0 0 4px; }
+  .sub{ font-size:12.5px; opacity:.6; margin-bottom:24px; }
+  .note{
+    background:var(--ivory); border:1px solid var(--line); border-radius:10px; padding:14px 16px;
+    font-size:12.5px; opacity:.75; margin-bottom:20px; line-height:1.5;
+  }
+  .toolbar{ display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  button{
+    font-family:inherit; cursor:pointer; border:1px solid var(--dark); background:var(--dark); color:var(--ivory);
+    padding:10px 16px; border-radius:3px; font-size:12px; letter-spacing:.05em; text-transform:uppercase; font-weight:700;
+  }
+  button.secondary{ background:transparent; color:var(--dark); }
+  button.danger{ background:#B5544A; border-color:#B5544A; }
+  .stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:22px; }
+  .stat{ background:var(--ivory); border:1px solid var(--line); border-radius:10px; padding:14px; text-align:center; }
+  .stat b{ display:block; font-size:22px; font-family:"Cormorant Garamond",serif; }
+  .stat span{ font-size:10px; opacity:.6; text-transform:uppercase; letter-spacing:.04em; }
+  table{ width:100%; border-collapse:collapse; background:var(--ivory); border-radius:10px; overflow:hidden; border:1px solid var(--line); }
+  th,td{ padding:10px 12px; text-align:left; font-size:12.5px; border-bottom:1px solid var(--line); }
+  th{ background:var(--cream); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; opacity:.7; }
+  tr:last-child td{ border-bottom:none; }
+  .status-confirmed{ color:#4d7a3a; font-weight:700; }
+  .status-cancelled{ color:#B5544A; font-weight:700; text-decoration:line-through; }
+  .row-actions{ display:flex; gap:6px; }
+  .row-actions button{ padding:6px 10px; font-size:10px; }
+  .empty{ text-align:center; padding:40px 20px; opacity:.6; font-size:13px; }
+  .table-scroll{ overflow-x:auto; }
+  a.back{ font-size:12px; color:var(--brown); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Демо-панель записей</h1>
+  <p class="sub"><a class="back" href="index.html">← Вернуться на сайт</a></p>
+
+  <div class="note">
+    Это временная demo-панель без авторизации: она читает записи прямо из localStorage браузера.
+    Она видна только тем, кто откроет <code>admin.html</code>, и подходит для тестирования на этапе запуска.
+    Позже сюда можно подключить настоящий backend с логином.
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="toolbar">
+    <button class="secondary" id="refreshBtn">Обновить</button>
+    <button class="danger" id="clearBtn">Очистить все demo-записи</button>
+  </div>
+
+  <div class="table-scroll">
+    <table id="bookingsTable">
+      <thead>
+        <tr>
+          <th>Дата</th><th>Время</th><th>Клиент</th><th>Услуга</th><th>Цена</th><th>Статус</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="bookingsBody"></tbody>
+    </table>
+  </div>
+  <div class="empty" id="emptyState" style="display:none;">Записей пока нет.</div>
+</div>
+
+<script>
+  const STORAGE_KEY = "snezhana_bookings";
+
+  function getBookings() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch (e) { return []; }
+  }
+  function saveBookings(list) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  }
+  function formatPrice(n){ return Number(n).toLocaleString("ru-RU") + " ₸"; }
+
+  function render() {
+    const bookings = getBookings().sort((a,b) => (a.date+a.startTime).localeCompare(b.date+b.startTime));
+    const body = document.getElementById("bookingsBody");
+    const empty = document.getElementById("emptyState");
+    const table = document.getElementById("bookingsTable");
+
+    if (!bookings.length) {
+      table.style.display = "none";
+      empty.style.display = "block";
+    } else {
+      table.style.display = "table";
+      empty.style.display = "none";
+      body.innerHTML = bookings.map(b => `
+        <tr data-id="${b.id}">
+          <td>${b.date}</td>
+          <td>${b.startTime}–${b.endTime}</td>
+          <td>${escapeHtml(b.name)}<br><small style="opacity:.6;">${escapeHtml(b.phone||"")}</small></td>
+          <td>${escapeHtml(b.service)}</td>
+          <td>${formatPrice(b.price)}</td>
+          <td class="status-${b.status}">${b.status === "cancelled" ? "Отменена" : "Подтверждена"}</td>
+          <td class="row-actions">
+            ${b.status !== "cancelled" ? `<button class="secondary" data-action="cancel">Отменить</button>` : ""}
+            <button class="danger" data-action="delete">Удалить</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    const total = bookings.length;
+    const confirmed = bookings.filter(b => b.status !== "cancelled").length;
+    const cancelled = bookings.filter(b => b.status === "cancelled").length;
+    const todayKey = new Date().toISOString().slice(0,10);
+    const today = bookings.filter(b => b.date === todayKey && b.status !== "cancelled").length;
+
+    document.getElementById("stats").innerHTML = `
+      <div class="stat"><b>${total}</b><span>Всего записей</span></div>
+      <div class="stat"><b>${today}</b><span>Сегодня</span></div>
+      <div class="stat"><b>${confirmed}</b><span>Подтверждено</span></div>
+      <div class="stat"><b>${cancelled}</b><span>Отменено</span></div>
+    `;
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+  }
+
+  document.getElementById("bookingsBody").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const tr = btn.closest("tr");
+    const id = tr.dataset.id;
+    let bookings = getBookings();
+    if (btn.dataset.action === "cancel") {
+      bookings = bookings.map(b => b.id === id ? { ...b, status: "cancelled" } : b);
+      saveBookings(bookings);
+    } else if (btn.dataset.action === "delete") {
+      if (confirm("Удалить эту запись безвозвратно?")) {
+        bookings = bookings.filter(b => b.id !== id);
+        saveBookings(bookings);
+      }
+    }
+    render();
+  });
+
+  document.getElementById("refreshBtn").addEventListener("click", render);
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    if (confirm("Удалить ВСЕ demo-записи из этого браузера? Действие необратимо.")) {
+      localStorage.removeItem(STORAGE_KEY);
+      render();
+    }
+  });
+
+  render();
+</script>
+</body>
+</html>
