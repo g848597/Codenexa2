@@ -1,0 +1,11 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1
+pydantic==2.9.2
+httpx==0.27.2
+
+# Этап 5 (Дизайн) — загрузка файлов в S3/S3-совместимое хранилище,
+# см. app/storage.py. Без него design-upload по-прежнему работает
+# (фоллбэк на локальный диск), boto3 нужен только если задан S3_BUCKET.
+boto3==1.35.36
