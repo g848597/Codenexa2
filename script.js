@@ -633,12 +633,14 @@
 
   function bookingErrorMessage(e) {
     switch (e && e.code) {
-      case "SLOT_TAKEN": return "Это время уже заняли, пока вы заполняли форму. Выберите другое.";
+      case "SLOT_TAKEN": return "Это время уже занято. Пожалуйста, выберите другое время.";
       case "RATE_LIMITED": return "Слишком много попыток записи подряд. Попробуйте через несколько минут.";
       case "DATE_IN_PAST":
       case "TIME_IN_PAST": return "Выбранное время уже прошло. Выберите другое.";
       case "OUTSIDE_WORKING_HOURS":
       case "DAY_OFF": return "В это время мастер не работает. Выберите другой день или время.";
+      case "SERVICE_NOT_FOUND": return "Эта услуга больше недоступна. Обновите страницу и выберите услугу заново.";
+      case "INTERNAL_ERROR": return "Сбой на сервере при сохранении записи. Попробуйте ещё раз через минуту.";
       default: return "Не удалось отправить запись. Проверьте интернет и попробуйте ещё раз.";
     }
   }
@@ -835,7 +837,14 @@
       start_time: state.selectedTime,
       comment: state.customer.comment,
     });
-    const b = res.booking;
+    const b = res && res.booking;
+    if (!b || !b.id) {
+      // Сервер ответил 2xx, но без объекта записи — считаем операцию неуспешной,
+      // а не показываем ложный экран "Запись подтверждена".
+      const err = new Error("BOOKING_MISSING_IN_RESPONSE");
+      err.code = "INTERNAL_ERROR";
+      throw err;
+    }
     const booking = {
       id: b.id,
       name: b.client_name,
