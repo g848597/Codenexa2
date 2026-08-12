@@ -19,13 +19,20 @@ api.telegram.org, railway.app). Отмечай выполненное `[x]`, о�
 ## 2. Railway — backend сервис
 
 - [ ] Создать новый Railway-сервис на этот же репозиторий (`g848597/Codenexa2`), ветка `main`, root — корень репо (там `Procfile` и `railway.json`).
-- [ ] Задать переменные окружения в Railway → Variables:
-  - `DATABASE_URL` — строка подключения к Supabase Postgres (Transaction Pooler, порт 6543 — та же, что использовалась для лендинга Снежаны, либо новая, если хочешь изолировать).
-  - `TELEGRAM_BOT_TOKEN` — токен твоего бота (у тебя уже есть).
-  - `CORS_ORIGINS` — origin фронтенда после деплоя (например `https://<твой-фронтенд-домен>.up.railway.app`). Можно временно добавить и `http://localhost:5173` через запятую для локальной разработки.
-  - `JWT_SECRET` — любая длинная случайная строка (сгенерируй, например: `openssl rand -hex 32`). Никому не показывай, не коммить в git.
-  - `SUPABASE_URL` — `https://vlpgdiivliozzhacymaw.supabase.co`
-  - `SUPABASE_SERVICE_ROLE_KEY` — если backend будет напрямую дёргать Supabase REST/Storage (сейчас не используется, но пусть будет на будущее). **Только в Railway Variables, никогда не в коде.**
+- [ ] Задать переменные окружения в Railway → Variables (см. разбор ниже — часть значений из старых проектов, часть нужно взять заново):
+
+  **Подтверждено, использовать как есть:**
+  - `ENVIRONMENT=production`
+  - `TELEGRAM_BOT_TOKEN` — токен бота `CodeNexaminiappBot` (тот, что уже прислала — имя бота совпадает с проектом, это правильный токен).
+  - `JWT_SECRET` — тот, что уже сгенерирован (длинная случайная строка), можно переиспользовать.
+
+  **Нужно взять заново (НЕ из старого списка секретов):**
+  - `DATABASE_URL` — строка подключения именно к проекту `vlpgdiivliozzhacymaw` (Supabase Dashboard → этот проект → Settings → Database → Connection string → Transaction pooler, порт 6543). ⚠️ В присланном списке `DATABASE_URL` указывал на СТАРЫЙ проект `temjwwglowbuarxuixpa` — его использовать нельзя, туда наши `nexa_*` миграции не попадут.
+  - `SUPABASE_SERVICE_ROLE_KEY` — из Supabase Dashboard → `vlpgdiivliozzhacymaw` → Settings → API Keys (не из старого проекта).
+  - `CORS_ORIGINS` — появится после деплоя frontend-сервиса (Этап 5).
+
+  **НЕ добавлять в этот сервис** (относятся к другим/старым проектам — sports-бот, AI Sport и т.п.): `TELEGRAM_WEBHOOK_SECRET`, `ADMIN_TELEGRAM_IDS`, `ADMIN_EMAILS`, `CACHE_TTL`, `REQUEST_DELAY_MS`, `FOOTBALLDATA_API_KEY`, `FOOTBALLDATA_BASE_URL`, `CLEARSPORTS_API_KEY`, `CLEARSPORTS_BASE_URL`.
+
 - [ ] После первого деплоя проверить `https://<backend-домен>/health` → должен вернуть `{"status":"ok"}`.
 - [ ] Проверить `https://<backend-домен>/ready` → `database: true` (подтверждает, что `DATABASE_URL` рабочий).
 
