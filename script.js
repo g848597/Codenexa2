@@ -31,7 +31,7 @@
   };
 
   /* ================= SUPABASE ================= */
-  const SUPABASE_URL = "https://temjwwglowbuarxuixpa.supabase.co";
+  const SUPABASE_URL = "https://vlpgdiivliozzhacymaw.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_6kcF4N5DLCpLMSoaPDNmgQ_LHFDFZUq";
   const supabase = window.supabase
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
