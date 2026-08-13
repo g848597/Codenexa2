@@ -8,3 +8,4 @@ dist/
 *.log
 frontend/dist/
 frontend/.env
+frontend/tsconfig.tsbuildinfo
