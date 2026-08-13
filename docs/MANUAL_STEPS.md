@@ -46,10 +46,14 @@ api.telegram.org, railway.app). Отмечай выполненное `[x]`, о�
 - [ ] Либо через `/newapp`, если нужен отдельный Mini App (не просто menu button).
 - [ ] Проверить открытие Mini App внутри самого Telegram (не в обычном браузере) — только там будет настоящий `window.Telegram.WebApp` с реальным `initData`.
 
-## 4. Frontend — Railway сервис (появится после Этапа 5)
+## 4. Frontend — Railway сервис
 
-- [ ] Создать отдельный Railway-сервис (или second service в этом же проекте Railway) для `frontend/` с `npm install && npm run build`, раздачей `dist/`.
-- [ ] Задать `VITE_API_BASE_URL` = адрес backend-сервиса из шага 2.
+Frontend готов (Этап 5 выполнен, build проходит, тесты 10/10 зелёные).
+
+- [ ] Создать отдельный Railway-сервис на этот же репозиторий, но с **Root Directory = `frontend`** (в Railway это настраивается в Settings сервиса). Там уже лежит `frontend/railway.json` (build: `npm install && npm run build`, start: `npx serve -s dist -l $PORT`).
+- [ ] Задать переменную `VITE_API_BASE_URL` = публичный URL backend-сервиса из шага 2 (например `https://codenexa-backend-production.up.railway.app`).
+- [ ] После деплоя открыть URL фронтенда в обычном браузере — должно показать экран "Откройте это приложение через Telegram" (это ожидаемо, AuthGate специально блокирует работу вне Telegram в production).
+- [ ] Вернуться к шагу 2 и обновить `CORS_ORIGINS` backend-сервиса на реальный URL фронтенда (сейчас там `http://localhost:5173`).
 
 ## 5. Секреты — финальная проверка
 
